@@ -1,0 +1,28 @@
+[toolchain]
+anchor_version = "0.30.1"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+hatchmind = "CaAnbZJBkbZSGFgpi6W1oxxeuKeFFz9PvZJxGoTMxmRy"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "Localnet"
+wallet = ".local/provider.json"
+
+[scripts]
+test = "NODE_OPTIONS=--no-experimental-strip-types yarn mocha --require ts-node/register/transpile-only --extension ts -t 180000 tests/**/*.ts --reporter ./scripts/reporter.cjs"
+
+[test]
+startup_wait = 15000
+shutdown_wait = 2000
+upgradeable = false
+
+[[test.genesis]]
+address = "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d"
+program = "vendor/mpl_core.so"

@@ -1,0 +1,14 @@
+{
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/target": true,
+    "**/.anchor": true,
+    "**/test-ledger": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/target": true,
+    "**/.local": true,
+    "**/test-ledger": true
+  }
+}

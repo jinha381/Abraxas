@@ -1,0 +1,8 @@
+node_modules/
+target/
+.anchor/
+test-ledger/
+vendor/*.so
+vendor/*.json
+.local/
+*.keypair.json

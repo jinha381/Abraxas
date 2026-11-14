@@ -1,0 +1,14 @@
+[workspace]
+members = ["programs/hatchmind"]
+exclude = ["logic"]
+resolver = "2"
+[profile.release]
+overflow-checks = true
+lto = "fat"
+codegen-units = 1
+
+[patch.crates-io]
+anchor-syn = { path = "vendor/anchor-syn" }
+
+[profile.dev.package.libsecp256k1]
+opt-level = 3
