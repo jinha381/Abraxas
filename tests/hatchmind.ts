@@ -16,9 +16,9 @@ describe("HatchMind local on-chain integration", function () {
   anchor.setProvider(provider);
   const program = anchor.workspace.Hatchmind as anchor.Program<Hatchmind>;
   const core = new PublicKey("CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d");
-  const dewey = Keypair.generate(), axie = Keypair.generate(), kitty = Keypair.generate(), tama = Keypair.generate();
+  const user1 = Keypair.generate(), user2 = Keypair.generate(), user3 = Keypair.generate(), user4 = Keypair.generate();
   const stranger = Keypair.generate();
-  const wallets = [dewey, axie, kitty, tama];
+  const wallets = [user1, user2, user3, user4];
   const pets = wallets.map(() => Keypair.generate());
   const config = pda([Buffer.from("config")]);
   let sequence = 0;
@@ -58,7 +58,7 @@ describe("HatchMind local on-chain integration", function () {
     return umi.use(keypairIdentity(umi.eddsa.createKeypairFromSecretKey(who.secretKey)));
   }
   async function ownerOf(asset: PublicKey) {
-    return (await fetchAssetV1(umiFor(dewey), publicKey(asset.toBase58()), { commitment: "confirmed" })).owner.toString();
+    return (await fetchAssetV1(umiFor(user1), publicKey(asset.toBase58()), { commitment: "confirmed" })).owner.toString();
   }
   async function transfer(asset: Keypair, from: Keypair, to: Keypair) {
     const umi = umiFor(from);
@@ -66,7 +66,7 @@ describe("HatchMind local on-chain integration", function () {
       .sendAndConfirm(umi, { send: { preflightCommitment: "confirmed" }, confirm: { commitment: "confirmed" } });
     assert.equal(await ownerOf(asset.publicKey), to.publicKey.toBase58());
   }
-  async function request(a = pets[0], b = pets[1], who = dewey, ttl = 120) {
+  async function request(a = pets[0], b = pets[1], who = user1, ttl = 120) {
     const nonce = ++sequence;
     const address = breed(a.publicKey, b.publicKey, nonce);
     await program.methods.requestBreeding(new anchor.BN(nonce), new anchor.BN(ttl)).accountsStrict({
@@ -76,24 +76,24 @@ describe("HatchMind local on-chain integration", function () {
     return { address, nonce, a, b };
   }
   type Req = Awaited<ReturnType<typeof request>>;
-  async function approve(r: Req, who = axie) {
+  async function approve(r: Req, who = user2) {
     return program.methods.approveBreeding().accountsStrict({
       request: r.address, assetA: r.a.publicKey, assetB: r.b.publicKey, owner: who.publicKey,
     }).signers([who]).rpc();
   }
-  function execution(r: Req, child: Keypair, who = dewey, childOwner = dewey.publicKey) {
+  function execution(r: Req, child: Keypair, who = user1, childOwner = user1.publicKey) {
     return program.methods.executeBreeding().accountsStrict({
       config, request: r.address, petA: pet(r.a.publicKey), petB: pet(r.b.publicKey),
       assetA: r.a.publicKey, assetB: r.b.publicKey, child: pet(child.publicKey), childAsset: child.publicKey,
       childOwner, payer: who.publicKey, coreProgram: core, systemProgram: SystemProgram.programId,
     }).preInstructions([budget()]).signers([who, child]);
   }
-  async function execute(r: Req, who = dewey) {
+  async function execute(r: Req, who = user1) {
     const child = Keypair.generate();
     await execution(r, child, who).rpc();
     return child;
   }
-  async function makeGift(asset: Keypair, who = dewey, ttl = 120) {
+  async function makeGift(asset: Keypair, who = user1, ttl = 120) {
     const nonce = ++sequence;
     const secret = randomBytes(32);
     const hash = createHash("sha256").update(secret).digest();
@@ -106,13 +106,13 @@ describe("HatchMind local on-chain integration", function () {
     return { address, asset, nonce, secret };
   }
   type Gift = Awaited<ReturnType<typeof makeGift>>;
-  function claim(g: Gift, who = kitty, secret = g.secret) {
+  function claim(g: Gift, who = user3, secret = g.secret) {
     return program.methods.claimEgg([...secret]).accountsStrict({
       gift: g.address, asset: g.asset.publicKey, recipient: who.publicKey,
       coreProgram: core, systemProgram: SystemProgram.programId,
     }).preInstructions([budget()]).signers([who]).rpc();
   }
-  function reclaim(g: Gift, who = dewey) {
+  function reclaim(g: Gift, who = user1) {
     return program.methods.reclaimGift().accountsStrict({
       gift: g.address, asset: g.asset.publicKey, giver: who.publicKey,
       coreProgram: core, systemProgram: SystemProgram.programId,
@@ -129,7 +129,7 @@ describe("HatchMind local on-chain integration", function () {
     }).rpc();
     assert.equal((await program.account.config.fetch(config)).stageSeconds.toNumber(), 3, "must build with local-testing");
   });
-  it("Genesis: dewey/axie/kitty/tama receive rabbit/turtle/guinea-pig/weasel, one each", async () => {
+  it("Genesis: user1/user2/user3/user4 receive rabbit(Dewey)/turtle(Shelly)/guinea-pig(Peachy)/weasel(Axy), one each", async () => {
     for (let i = 0; i < 4; i++) {
       await program.methods.registerPet(i).accountsStrict({
         config, pet: pet(pets[i].publicKey), asset: pets[i].publicKey, owner: wallets[i].publicKey,
@@ -144,9 +144,9 @@ describe("HatchMind local on-chain integration", function () {
   it("Genesis: a fifth registration cannot duplicate a species", async () => {
     const asset = Keypair.generate();
     await fails(program.methods.registerPet(0).accountsStrict({
-      config, pet: pet(asset.publicKey), asset: asset.publicKey, owner: dewey.publicKey,
+      config, pet: pet(asset.publicKey), asset: asset.publicKey, owner: user1.publicKey,
       coreProgram: core, systemProgram: SystemProgram.programId,
-    }).signers([dewey, asset]).rpc(), "AlreadyRegistered");
+    }).signers([user1, asset]).rpc(), "AlreadyRegistered");
     assert.isNull(await provider.connection.getAccountInfo(asset.publicKey));
   });
   it("S01: a non-owner cannot evolve someone else's Core asset", async () => {
@@ -156,8 +156,8 @@ describe("HatchMind local on-chain integration", function () {
   });
   it("S06: growth cannot skip a stage", async () => {
     await fails(program.methods.recordEvolution(2).accountsStrict({
-      config, pet: pet(pets[0].publicKey), asset: pets[0].publicKey, owner: dewey.publicKey,
-    }).signers([dewey]).rpc(), "InvalidStage");
+      config, pet: pet(pets[0].publicKey), asset: pets[0].publicKey, owner: user1.publicKey,
+    }).signers([user1]).rpc(), "InvalidStage");
   });
   it("S06: eggs cannot breed", async () => {
     await fails(request(), "InvalidStage");
@@ -192,20 +192,20 @@ describe("HatchMind local on-chain integration", function () {
   });
   it("S04: transfer pet A after both consent -> OwnerChanged", async () => {
     const r = await request(); await approve(r);
-    await transfer(pets[0], dewey, tama);
+    await transfer(pets[0], user1, user4);
     await fails(execution(r, Keypair.generate()).rpc(), "OwnerChanged");
     assert.isFalse((await program.account.breedingRequest.fetch(r.address)).consumed);
-    await transfer(pets[0], tama, dewey);
+    await transfer(pets[0], user4, user1);
   });
   it("S04: transfer pet B after consent -> OwnerChanged", async () => {
     const r = await request(); await approve(r);
-    await transfer(pets[1], axie, kitty);
+    await transfer(pets[1], user2, user3);
     await fails(execution(r, Keypair.generate()).rpc(), "OwnerChanged");
-    await transfer(pets[1], kitty, axie);
+    await transfer(pets[1], user3, user2);
   });
   it("S11: cancelled breeding request cannot execute", async () => {
     const r = await request(); await approve(r);
-    await program.methods.cancelBreeding().accountsStrict({ request: r.address, owner: axie.publicKey }).signers([axie]).rpc();
+    await program.methods.cancelBreeding().accountsStrict({ request: r.address, owner: user2.publicKey }).signers([user2]).rpc();
     await fails(execution(r, Keypair.generate()).rpc(), "Cancelled");
   });
   it("S01: stranger cannot cancel a breeding request", async () => {
@@ -213,15 +213,15 @@ describe("HatchMind local on-chain integration", function () {
     await fails(program.methods.cancelBreeding().accountsStrict({ request: r.address, owner: stranger.publicKey }).signers([stranger]).rpc(), "Unauthorized");
   });
   it("Expired: expired request rejects both approval and execution", async () => {
-    const r = await request(pets[0], pets[1], dewey, 3);
+    const r = await request(pets[0], pets[1], user1, 3);
     const state = await program.account.breedingRequest.fetch(r.address);
     await until(state.expires.toNumber());
     await fails(approve(r), "Expired");
     await fails(execution(r, Keypair.generate()).rpc(), "Expired");
   });
   it("Invalid TTL: zero and negative request TTL are rejected", async () => {
-    await fails(request(pets[0], pets[1], dewey, 0), "InvalidTtl");
-    await fails(request(pets[0], pets[1], dewey, -1), "InvalidTtl");
+    await fails(request(pets[0], pets[1], user1, 0), "InvalidTtl");
+    await fails(request(pets[0], pets[1], user1, -1), "InvalidTtl");
   });
   it("S12: cooldown rechecked at execution and new request; atomic rollback verified", async () => {
     await ready();
@@ -235,10 +235,10 @@ describe("HatchMind local on-chain integration", function () {
     const ixRequest = await program.methods.requestBreeding(new anchor.BN(nonce), new anchor.BN(120)).accountsStrict({
       config, petA: pet(pets[0].publicKey), petB: pet(pets[1].publicKey),
       assetA: pets[0].publicKey, assetB: pets[1].publicKey,
-      request: breed(pets[0].publicKey, pets[1].publicKey, nonce), requester: dewey.publicKey, systemProgram: SystemProgram.programId,
+      request: breed(pets[0].publicKey, pets[1].publicKey, nonce), requester: user1.publicKey, systemProgram: SystemProgram.programId,
     }).instruction();
     try {
-      await provider.sendAndConfirm(new Transaction().add(budget(), ix1, ixRequest), [dewey, child]);
+      await provider.sendAndConfirm(new Transaction().add(budget(), ix1, ixRequest), [user1, child]);
       assert.fail("expected Cooldown");
     } catch (e: any) {
       const parsed = anchor.AnchorError.parse(e.logs ?? []);
@@ -250,7 +250,7 @@ describe("HatchMind local on-chain integration", function () {
     const child2 = Keypair.generate();
     const secondIx = await execution(second, child2).instruction();
     try {
-      await provider.sendAndConfirm(new Transaction().add(budget(), ix1, secondIx), [dewey, child, child2]);
+      await provider.sendAndConfirm(new Transaction().add(budget(), ix1, secondIx), [user1, child, child2]);
       assert.fail("expected Cooldown");
     } catch (e: any) {
       const parsed = anchor.AnchorError.parse(e.logs ?? []);
@@ -271,7 +271,7 @@ describe("HatchMind local on-chain integration", function () {
     assert.equal(child.parentA.toBase58(), pets[0].publicKey.toBase58());
     assert.equal(child.parentB.toBase58(), pets[1].publicKey.toBase58());
     assert.equal(child.stage, 0);
-    assert.equal(await ownerOf(egg.publicKey), dewey.publicKey.toBase58());
+    assert.equal(await ownerOf(egg.publicKey), user1.publicKey.toBase58());
     assert.isTrue((await program.account.breedingRequest.fetch(r.address)).consumed);
     await fails(execution(r, Keypair.generate()).rpc(), "AlreadyConsumed");
   });
@@ -281,61 +281,61 @@ describe("HatchMind local on-chain integration", function () {
     const state: any = used.account;
     await fails(execution({ address: used.publicKey, nonce: state.nonce.toNumber(), a: pets[0], b: pets[1] }, Keypair.generate()).rpc(), "AlreadyConsumed");
   });
-  it("Same-wallet breeding: transfer guinea pig kitty -> dewey; dewey request alone suffices", async () => {
-    await transfer(pets[2], kitty, dewey);
+  it("Same-wallet breeding: transfer guinea pig (Peachy) user3 -> user1; user1 request alone suffices", async () => {
+    await transfer(pets[2], user3, user1);
     await ready(pets[0], pets[2]);
-    const r = await request(pets[0], pets[2], dewey);
+    const r = await request(pets[0], pets[2], user1);
     const state = await program.account.breedingRequest.fetch(r.address);
     assert.isTrue(state.consentA); assert.isTrue(state.consentB);
     assert.equal(state.ownerA.toBase58(), state.ownerB.toBase58());
-    secondEgg = await execute(r, dewey);
-    assert.equal(await ownerOf(secondEgg.publicKey), dewey.publicKey.toBase58());
+    secondEgg = await execute(r, user1);
+    assert.equal(await ownerOf(secondEgg.publicKey), user1.publicKey.toBase58());
   });
   it("S07: next growth is too early within the same transaction", async () => {
     const r: any = await program.account.petRecord.fetch(pet(egg.publicKey));
     await until(r.changedAt.toNumber() + 3);
     const ix1 = await program.methods.recordEvolution(1).accountsStrict({
-      config, pet: pet(egg.publicKey), asset: egg.publicKey, owner: dewey.publicKey,
+      config, pet: pet(egg.publicKey), asset: egg.publicKey, owner: user1.publicKey,
     }).instruction();
     const ix2 = await program.methods.recordEvolution(2).accountsStrict({
-      config, pet: pet(egg.publicKey), asset: egg.publicKey, owner: dewey.publicKey,
+      config, pet: pet(egg.publicKey), asset: egg.publicKey, owner: user1.publicKey,
     }).instruction();
     try {
-      await provider.sendAndConfirm(new Transaction().add(ix1, ix2), [dewey]);
+      await provider.sendAndConfirm(new Transaction().add(ix1, ix2), [user1]);
       assert.fail("expected TooEarly");
     } catch (e: any) { assert.equal(anchor.AnchorError.parse(e.logs ?? [])?.error.errorCode.code, "TooEarly"); }
     assert.equal((await program.account.petRecord.fetch(pet(egg.publicKey))).stage, 0, "failed atomic growth rolls back");
   });
   it("S08: wrong gift secret rejected; actual egg stays in Gift PDA", async () => {
     const g = await makeGift(egg);
-    await fails(claim(g, kitty, randomBytes(32)), "BadSecret");
+    await fails(claim(g, user3, randomBytes(32)), "BadSecret");
     assert.equal(await ownerOf(egg.publicKey), g.address.toBase58());
     await claim(g);
-    assert.equal(await ownerOf(egg.publicKey), kitty.publicKey.toBase58());
+    assert.equal(await ownerOf(egg.publicKey), user3.publicKey.toBase58());
   });
   it("S09: gift link cannot be claimed twice", async () => {
-    const g = await makeGift(egg, kitty);
-    await claim(g, dewey);
-    await fails(claim(g, tama), "AlreadyClaimed");
-    assert.equal(await ownerOf(egg.publicKey), dewey.publicKey.toBase58());
+    const g = await makeGift(egg, user3);
+    await claim(g, user1);
+    await fails(claim(g, user4), "AlreadyClaimed");
+    assert.equal(await ownerOf(egg.publicKey), user1.publicKey.toBase58());
   });
   it("S10: giver cannot reclaim before expiry", async () => {
-    const g = await makeGift(egg, dewey);
+    const g = await makeGift(egg, user1);
     await fails(reclaim(g), "NotExpired");
-    await claim(g, dewey);
+    await claim(g, user1);
   });
   it("S01: stranger cannot create a gift for another owner's egg", async () => {
     await fails(makeGift(egg, stranger), "Unauthorized");
   });
   it("Expired gift: claim fails at expiry; only original giver reclaims; replay rejected", async () => {
-    const g = await makeGift(secondEgg, dewey, 3);
+    const g = await makeGift(secondEgg, user1, 3);
     const state = await program.account.giftClaim.fetch(g.address);
     await until(state.expires.toNumber());
-    await fails(claim(g, kitty), "Expired");
+    await fails(claim(g, user3), "Expired");
     await fails(reclaim(g, stranger), "Unauthorized");
     assert.equal(await ownerOf(secondEgg.publicKey), g.address.toBase58());
     await reclaim(g);
-    assert.equal(await ownerOf(secondEgg.publicKey), dewey.publicKey.toBase58());
+    assert.equal(await ownerOf(secondEgg.publicKey), user1.publicKey.toBase58());
     assert.isTrue((await program.account.giftClaim.fetch(g.address)).reclaimed);
     await fails(reclaim(g), "AlreadyClaimed");
     await fails(claim(g), "AlreadyClaimed");
@@ -345,13 +345,13 @@ describe("HatchMind local on-chain integration", function () {
       const state = await program.account.petRecord.fetch(pet(secondEgg.publicKey));
       await until(state.changedAt.toNumber() + 3);
       await program.methods.recordEvolution(stage).accountsStrict({
-        config, pet: pet(secondEgg.publicKey), asset: secondEgg.publicKey, owner: dewey.publicKey,
-      }).signers([dewey]).rpc();
+        config, pet: pet(secondEgg.publicKey), asset: secondEgg.publicKey, owner: user1.publicKey,
+      }).signers([user1]).rpc();
     }
     for (const stage of [2, 4]) {
       await fails(program.methods.recordEvolution(stage).accountsStrict({
-        config, pet: pet(secondEgg.publicKey), asset: secondEgg.publicKey, owner: dewey.publicKey,
-      }).signers([dewey]).rpc(), "InvalidStage");
+        config, pet: pet(secondEgg.publicKey), asset: secondEgg.publicKey, owner: user1.publicKey,
+      }).signers([user1]).rpc(), "InvalidStage");
     }
   });
 });
