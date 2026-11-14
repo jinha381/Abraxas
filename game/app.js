@@ -672,15 +672,21 @@
     const own = q.owner === state.wallet;
     return '<button class="strip-card ' + (q.id === state.selected ? "selected " : "") + (own ? "" : "other") + '" data-action="select" data-pet="' + esc(q.id) + '">' + (own ? '<span class="mine-flag">내 친구</span>' : "") + petSprite(q) + "<strong>" + esc(q.name) + "</strong><small>" + types[q.type].name + " · " + stageNames[q.stage] + "</small></button>";
   }
-  function growPanel(p) {
+  function growLabel(p) {
     const own = p.owner === state.wallet,
       seconds = Math.max(0, Math.ceil((p.changedAt + 3000 - Date.now()) / 1000));
-    const label = p.stage === 3 ? "진화 완료" : seconds > 0 ? seconds + "초 후 성장" : p.stage === 0 ? "부화시키기" : "성장하기";
+    if (p.stage === 3) return { text: "진화 완료", off: true };
+    if (seconds > 0) return { text: seconds + "초 후 성장", off: true };
+    if (p.stage === 2 && !evoPlan(p).ok) return { text: "성향 노드 " + evoPlan(p).got.length + "/2 필요", off: true };
+    return { text: p.stage === 0 ? "부화시키기" : p.stage === 2 ? "진화하기" : "성장하기", off: !own };
+  }
+  function growPanel(p) {
+    const own = p.owner === state.wallet, g = growLabel(p);
     return (
       '<section class="panel grow-panel"><h3>' + esc(p.name) + "의 성장</h3><p>" +
-      (p.stage === 2 ? "다음 진화 갈래는 학습된 기질로 정해져요." : p.stage === 0 ? "알을 쓰다듬어 따뜻하게 해 주세요." : "한 단계씩 자라요. 체험용이라 3초면 돼요.") +
-      "</p>" + growthSteps(p) +
-      '<button class="grow-btn" data-action="grow" ' + (!own || p.stage === 3 ? "disabled" : "") + ">" + esc(label) + icon("arrow") + "</button></section>"
+      (p.stage === 2 ? "진화 갈래는 얻은 성향 노드의 길을 따라 정해져요." : p.stage === 0 ? "알을 쓰다듬어 따뜻하게 해 주세요." : p.stage === 3 ? "진화를 마쳤어요. 트리에서 다음 노드를 확인해 보세요." : "한 단계씩 자라요. 체험용이라 3초면 돼요.") +
+      "</p>" + growthSteps(p) + traitChips(p) + evoPreview(p) +
+      '<button class="grow-btn" data-action="grow" ' + (!own || g.off ? "disabled" : "") + ">" + esc(g.text) + icon("arrow") + "</button></section>"
     );
   }
   function home() {
@@ -1003,12 +1009,43 @@
     setFrame();
     body();
   }
+  function interruptIdle() {
+    const pet = petEl(), stage = $("#stage");
+    if (pet && stage) {
+      const x = (pet.getBoundingClientRect().left + pet.offsetWidth / 2 - stage.getBoundingClientRect().left) / stage.clientWidth * 100;
+      pet.style.transition = "none";
+      stg.x = Math.max(8, Math.min(92, Math.round(x)));
+      pet.style.left = stg.x + "%";
+    }
+    stage?.classList.remove("strolling");
+    stg.gen++;
+    stg.busy = false;
+    setFrame();
+    body();
+    const g = stg.gen;
+    idleLoop(g);
+    blinkLoop(g);
+  }
+  function announceTraits(p, fresh) {
+    if (!fresh || !fresh.length) return;
+    fresh.forEach((t) => addLog(p.name + "가 성향 노드 '" + t.name + "'을(를) 얻었어요."));
+    save();
+    if (route === "home") {
+      fx("spark", 4);
+      say("새 성향: " + fresh.map((t) => t.name).join("·") + "!", 2600);
+      refreshHome();
+    }
+    toast("성향 노드 획득 · " + fresh.map((t) => t.name).join(", ") + (p.stage === 2 && evoPlan(p).ok ? " — 이제 진화할 수 있어요!" : ""));
+  }
   async function interact(verb) {
     const p = selected();
     if (route !== "home") navigate("home");
     if (p.owner !== state.wallet) return toast("다른 지갑의 뉴로링이에요. 내 뉴로링을 골라 주세요.");
     if (p.stage === 0 && verb !== "pat") return toast("알이 부화하면 함께 할 수 있어요.");
-    if (stg.busy) return;
+    if (stg.busy) {
+      if (stg.acting) return;
+      interruptIdle();
+    }
     const gen = stg.gen;
     if (p.stage === 0) {
       body("wiggle");
@@ -1026,6 +1063,8 @@
       return toast("에너지가 부족해요. 먼저 재워 주세요.");
     }
     stg.busy = true;
+    stg.acting = true;
+    let fresh = [];
     $("#stage-panel")?.classList.add("busy");
     try {
       if (verb === "rest") {
@@ -1040,6 +1079,7 @@
         p.rests = (p.rests || 0) + 1;
         state.food = Math.min(99, state.food + 2);
         consolidate(p);
+        fresh = syncTraits(p);
         addLog(p.name + ": 휴식 · 기억 정리, 당근 +2");
         save();
         refreshHome();
@@ -1060,13 +1100,16 @@
       if (verb === "call") { p.stats.friendship = clamp(p.stats.friendship + 2); p.calls = (p.calls || 0) + 1; }
       if (verb === "walk") { p.stats.energy = clamp(p.stats.energy - 10); p.stats.food = clamp(p.stats.food - 6); p.stats.friendship = clamp(p.stats.friendship + 5); p.walks = (p.walks || 0) + 1; p.plays = (p.plays || 0) + 1; }
       learn(p, res, reward);
+      fresh = syncTraits(p);
       addLog(p.name + ": " + v.title + " → " + OUTS[res.k].name);
       save();
       refreshHome();
       chirp();
       await react(verb, res.k, gen);
     } finally {
+      stg.acting = false;
       if (gen === stg.gen) { stg.busy = false; $("#stage-panel")?.classList.remove("busy"); refreshHome(); }
+      announceTraits(p, fresh);
     }
   }
   function collection() {
@@ -1151,68 +1194,187 @@
     );
   }
 
+  /* =========================================================
+     성향 진화 트리 (팀원 기획: 기본형 → 경험으로 성향 노드 획득 → 노드 경로를 따라 분기 진화)
+     - 노드 조건 = 상호작용 횟수 + 커넥톰이 학습한 기질
+     - 한 번 얻은 노드는 유지(p.traits)
+     - 진화 = 얻은 노드 중 가장 깊게 자란 노드의 길을 따라 갈래 결정
+     ========================================================= */
+  const cnt = (p, k) => p[k] || 0;
+  const tem = (p, k) => temper(brainOf(p))[k];
   const TRAITS = [
-    { id: "challenge", kx: 500, ky: 10, name: "도전성", icon: "flag", color: "#e7a76c", x: 500, y: 92,
-      rule: "놀기 6회 이상 · 성장기 이상", ok: (p) => (p.plays || 0) >= 6 && p.stage >= 2 },
-    { id: "observe", kx: 290, ky: 95, name: "관찰력", icon: "eye", color: "#8fc3b8", x: 360, y: 170,
-      rule: "쉬기 3회 이상", ok: (p) => (p.rests || 0) >= 3 },
-    { id: "adapt", kx: 710, ky: 95, name: "적응력", icon: "refresh", color: "#9cc7a6", x: 640, y: 170,
-      rule: "먹이 3회 · 쉬기 2회 이상", ok: (p) => (p.feeds || 0) >= 3 && (p.rests || 0) >= 2 },
-    { id: "curious", kx: 140, ky: 195, name: "호기심", icon: "search", color: "#b9a3d6", x: 235, y: 262,
-      rule: "탐색형이거나 놀기 3회 이상", ok: (p) => p.type === 0 || (p.plays || 0) >= 3 },
-    { id: "independent", kx: 860, ky: 195, name: "독립성", icon: "feather", color: "#a9b4d9", x: 765, y: 262,
-      rule: "독립형이거나 쉬기 5회 이상", ok: (p) => p.type === 3 || (p.rests || 0) >= 5 },
-    { id: "outgoing", parent: [235, 262], kx: 50, ky: 265, name: "외향성", icon: "star", color: "#f0c56b", x: 110, y: 350,
-      rule: "놀기 4회 · 친밀도 70 이상", ok: (p) => (p.plays || 0) >= 4 && p.stats.friendship >= 70 },
-    { id: "friendly", kx: 270, ky: 420, name: "친화성", icon: "heart", color: "#e3a7b0", x: 370, y: 345,
-      rule: "친화형이거나 친밀도 80 이상", ok: (p) => p.type === 2 || p.stats.friendship >= 80 },
-    { id: "careful", kx: 730, ky: 420, name: "신중함", icon: "shield", color: "#8fa6c8", x: 630, y: 345,
-      rule: "신중형이거나 쉬기 4회 이상", ok: (p) => p.type === 1 || (p.rests || 0) >= 4 },
+    { id: "challenge", name: "도전성", icon: "flag", color: "#e2a08a", x: 500, y: 118, from: "J2", side: -1,
+      kids: [[425, 52], [575, 52]],
+      req: [["놀기·산책", (p) => cnt(p, "plays"), 5], ["성장 단계", (p) => p.stage, 2, (v) => stageNames[Math.min(v, 3)]]] },
+    { id: "observe", name: "관찰력", icon: "eye", color: "#8ec0bb", x: 330, y: 205, from: "J2", side: 0,
+      kids: [[232, 150], [318, 105]],
+      req: [["산책", (p) => cnt(p, "walks"), 2], ["부르기", (p) => cnt(p, "calls"), 2]] },
+    { id: "adapt", name: "적응력", icon: "refresh", color: "#9cc0a6", x: 670, y: 205, from: "J2", side: 1,
+      kids: [[768, 150], [682, 105]],
+      req: [["먹이", (p) => cnt(p, "feeds"), 3], ["재우기", (p) => cnt(p, "rests"), 2]] },
+    { id: "curious", name: "호기심", icon: "search", color: "#b4a2d4", x: 285, y: 335, from: "J2", side: 0,
+      kids: [[178, 268], [222, 228]],
+      req: [["놀기·산책", (p) => cnt(p, "plays"), 3], ["탐색 기질", (p) => tem(p, 0), 26, (v) => v + "%"]] },
+    { id: "independent", name: "독립성", icon: "feather", color: "#a8b0d4", x: 715, y: 335, from: "J2", side: 1,
+      kids: [[822, 268], [778, 228]],
+      req: [["독립 기질", (p) => tem(p, 3), 26, (v) => v + "%"], ["재우기", (p) => cnt(p, "rests"), 2]] },
+    { id: "outgoing", name: "외향성", icon: "star", color: "#e8c477", x: 140, y: 420, from: "curious", side: 0,
+      kids: [[48, 352], [48, 488]],
+      req: [["부르기", (p) => cnt(p, "calls"), 3], ["친밀도", (p) => Math.round(p.stats.friendship), 75]] },
+    { id: "friendly", name: "친화성", icon: "heart", color: "#dca3b2", x: 360, y: 470, from: "J1", side: 0,
+      kids: [[262, 548], [232, 470]],
+      req: [["쓰다듬기", (p) => cnt(p, "pats"), 4], ["친화 기질", (p) => tem(p, 2), 24, (v) => v + "%"]] },
+    { id: "careful", name: "신중함", icon: "shield", color: "#93a8c8", x: 640, y: 470, from: "J1", side: 1,
+      kids: [[738, 548], [768, 470]],
+      req: [["경계 기질", (p) => tem(p, 1), 24, (v) => v + "%"], ["재우기", (p) => cnt(p, "rests"), 2]] },
   ];
-  function traitTree(p) {
-    const J = [500, 430], R = [500, 520];
-    const got = TRAITS.map((t) => p.stage > 0 && t.ok(p));
-    const curve = (a, b) => "M" + a[0] + " " + a[1] + " Q" + a[0] + " " + (a[1] + b[1]) / 2 + " " + (a[0] + b[0]) / 2 + " " + (a[1] + b[1]) / 2 + " T" + b[0] + " " + b[1];
+  const TJ = { R: [500, 585], J1: [500, 470], J2: [500, 335] };
+  const traitById = (id) => TRAITS.find((t) => t.id === id);
+  function traitReady(p, t) {
+    if (p.stage === 0) return false;
+    if (t.from !== "J1" && t.from !== "J2" && !hasTrait(p, traitById(t.from))) return false;
+    return t.req.every(([, f, goal]) => f(p) >= goal);
+  }
+  function hasTrait(p, t) {
+    return (p.traits || []).includes(t.id) || traitReady(p, t);
+  }
+  function syncTraits(p) {
+    p.traits = p.traits || [];
+    const fresh = TRAITS.filter((t) => !p.traits.includes(t.id) && traitReady(p, t));
+    fresh.forEach((t) => p.traits.push(t.id));
+    return fresh;
+  }
+  function traitScore(p, t) {
+    return t.req.reduce((a, [, f, goal]) => a + Math.min(3, f(p) / Math.max(1, goal)), 0);
+  }
+  function evoPlan(p) {
+    const got = TRAITS.filter((t) => hasTrait(p, t));
+    if (got.length < 2) return { ok: false, got };
+    const main = got.slice().sort((a, b) => traitScore(p, b) - traitScore(p, a))[0];
+    let branch = main.side;
+    if (branch < 0) {
+      const t = temper(brainOf(p));
+      branch = t[0] + t[2] >= t[1] + t[3] ? 0 : 1;
+    }
+    return { ok: true, got, main, branch };
+  }
+  function parentPt(t) {
+    return t.from === "J1" ? TJ.J1 : t.from === "J2" ? TJ.J2 : [traitById(t.from).x, traitById(t.from).y];
+  }
+  const hexPts = (r) => {
+    const pts = [];
+    for (let i = 0; i < 6; i++) {
+      const a = (Math.PI / 3) * i + Math.PI / 6;
+      pts.push(Math.round(Math.cos(a) * r) + "," + Math.round(Math.sin(a) * r));
+    }
+    return pts.join(" ");
+  };
+  const step = (a, b) => {
+    const my = Math.round((a[1] + b[1]) / 2);
+    return "M" + a[0] + " " + a[1] + " L" + a[0] + " " + my + " L" + b[0] + " " + my + " L" + b[0] + " " + b[1];
+  };
+  function traitTree(p, opt = {}) {
+    const evoId = p.stage === 3 ? p.evoNode : opt.focus;
+    const got = TRAITS.map((t) => hasTrait(p, t));
+    const pathOf = (t) => (t && t.from !== "J1" && t.from !== "J2" ? [...pathOf(traitById(t.from)), t.id] : t ? [t.id] : []);
+    const evoPath = evoId ? pathOf(traitById(evoId)) : [];
     let lines = "", kids = "", nodes = "";
-    lines += '<path class="tt-line on" d="M' + R[0] + " " + R[1] + " L" + J[0] + " " + J[1] + '"/>';
+    const trunkOn = got.some(Boolean);
+    lines += '<path class="tt-line ' + (trunkOn ? "on" : "") + (evoPath.length ? " evo" : "") + '" d="M' + TJ.R[0] + " " + TJ.R[1] + " L" + TJ.J1[0] + " " + TJ.J1[1] + '"/>';
+    const upOn = TRAITS.some((t, i) => got[i] && (t.from === "J2" || (t.from !== "J1" && traitById(t.from).from === "J2")));
+    const upEvo = evoPath.length && traitById(evoPath[0]).from === "J2";
+    lines += '<path class="tt-line ' + (upOn ? "on" : "") + (upEvo ? " evo" : "") + '" d="M' + TJ.J1[0] + " " + TJ.J1[1] + " L" + TJ.J2[0] + " " + TJ.J2[1] + '"/>';
     TRAITS.forEach((t, i) => {
-      const on = got[i];
-      lines += '<path class="tt-line ' + (on ? "on" : "") + '" d="' + curve(t.parent || J, [t.x, t.y]) + '"/>';
-      lines += '<path class="tt-line locked" d="M' + t.x + " " + t.y + " L" + t.kx + " " + t.ky + '"/>';
-      kids += '<g class="tt-kid" transform="translate(' + t.kx + " " + t.ky + ')"><rect x="-17" y="-17" width="34" height="34" rx="9"/><path d="M-4 -1v-3a4 4 0 0 1 8 0v3M-6 -1h12v8h-12z"/></g>';
-      nodes += '<g class="tt-node ' + (on ? "on" : "off") + '" transform="translate(' + t.x + " " + t.y + ')" style="--c:' + t.color + '"><title>' + t.name + " · " + t.rule + '</title>' +
-        '<rect x="-30" y="-30" width="60" height="60" rx="14" class="tt-shadow"/><rect x="-30" y="-34" width="60" height="60" rx="14" class="tt-box"/>' +
-        '<use href="#i-' + t.icon + '" x="-14" y="-18" width="28" height="28" class="tt-icon"/>' +
-        (on ? '<g class="tt-badge" transform="translate(24 -32)"><circle r="11"/><path d="M-5 0l3 3 6-6"/></g>' : "") +
-        '<g class="tt-label" transform="translate(0 46)"><rect x="-36" y="-14" width="72" height="27" rx="13"/><text y="5">' + t.name + "</text></g></g>";
+      const on = got[i], evo = evoPath.includes(t.id), isMain = t.id === evoId;
+      lines += '<path class="tt-line ' + (on ? "on" : "") + (evo ? " evo" : "") + '" d="' + step(parentPt(t), [t.x, t.y]) + '"/>';
+      t.kids.forEach(([kx, ky]) => {
+        const next = isMain && p.stage === 3;
+        lines += '<path class="tt-line ' + (next ? "next" : "locked") + '" d="M' + t.x + " " + t.y + " L" + kx + " " + ky + '"/>';
+        kids += '<g class="tt-kid' + (next ? " next" : "") + '" transform="translate(' + kx + " " + ky + ')"><title>' + (next ? "다음 진화 노드 · 준비 중" : "추후 진화 가능") + '</title><polygon points="' + hexPts(19) + '"/><use href="#i-' + (next ? "spark" : "spark") + '" x="-7" y="-7" width="14" height="14" class="tt-kid-icon"/></g>';
+      });
+      const prog = t.req.map(([label, f, goal, fmt]) => label + " " + (fmt ? fmt(f(p)) : f(p)) + "/" + (fmt ? fmt(goal) : goal)).join(" · ");
+      nodes += '<g class="tt-node ' + (on ? "on" : "off") + (isMain ? " main" : "") + '" data-node="' + t.id + '" transform="translate(' + t.x + " " + t.y + ')" style="--c:' + t.color + '"><title>' + t.name + " · " + prog + '</title>' +
+        '<polygon points="' + hexPts(36) + '" class="tt-shadow" transform="translate(0 5)"/><polygon points="' + hexPts(36) + '" class="tt-box"/>' +
+        '<use href="#i-' + t.icon + '" x="-14" y="-14" width="28" height="28" class="tt-icon"/>' +
+        (isMain ? '<g class="tt-crown" transform="translate(0 -46)"><polygon points="-14,6 -14,-6 -7,0 0,-9 7,0 14,-6 14,6"/></g>' : on ? '<g class="tt-badge" transform="translate(27 -26)"><rect x="-9" y="-9" width="18" height="18"/><path d="M-5 0l3 3 6-6"/></g>' : "") +
+        '<g class="tt-label" transform="translate(0 52)"><rect x="-38" y="-14" width="76" height="26"/><text y="5">' + t.name + "</text></g></g>";
     });
     const count = got.filter(Boolean).length;
     return (
-      '<div class="tt-wrap"><svg class="trait-tree" viewBox="0 -15 1000 605" role="img" aria-label="' + esc(p.name) + "의 성향 트리, " + count + "개 획득\">" +
+      '<div class="tt-wrap' + (opt.anim ? " anim" : "") + '"><svg class="trait-tree" viewBox="0 0 1000 640" role="img" aria-label="' + esc(p.name) + "의 성향 진화 트리, " + count + "개 획득\">" +
       '<g class="tt-lines">' + lines + "</g>" + kids + nodes +
-      '<rect class="tt-junction" x="' + (J[0] - 11) + '" y="' + (J[1] - 11) + '" width="22" height="22" rx="5" transform="rotate(45 ' + J[0] + " " + J[1] + ')"/>' +
+      ["J1", "J2"].map((j) => '<rect class="tt-junction" x="' + (TJ[j][0] - 10) + '" y="' + (TJ[j][1] - 10) + '" width="20" height="20" transform="rotate(45 ' + TJ[j][0] + " " + TJ[j][1] + ')"/>').join("") +
       "</svg>" +
-      '<div class="tt-root">' + petSprite(p) + '<span class="name-tag">' + esc(p.name) + " · " + types[p.type].name + "</span></div></div>"
+      (opt.noRoot ? "" : '<div class="tt-root">' + petSprite(p) + '<span class="name-tag">' + esc(p.name) + " · " + types[p.type].name + "</span></div>") +
+      "</div>"
     );
+  }
+  function traitItem(p, t) {
+    const on = hasTrait(p, t);
+    const parentNeed = t.from !== "J1" && t.from !== "J2" && !hasTrait(p, traitById(t.from));
+    const bars = t.req.map(([label, f, goal, fmt]) => {
+      const v = f(p), pct = Math.min(100, Math.round((v / Math.max(1, goal)) * 100));
+      return '<span class="ti-req"><span>' + label + " <b>" + (fmt ? fmt(v) : v) + "</b>/" + (fmt ? fmt(goal) : goal) + '</span><i><u style="width:' + pct + '%"></u></i></span>';
+    }).join("");
+    return '<div class="trait-item ' + (on ? "on" : "") + (p.evoNode === t.id ? " main" : "") + '" style="--c:' + t.color + '"><span class="ti-icon">' + icon(t.icon) + "</span><span><strong>" + t.name + (p.evoNode === t.id ? " · 진화의 길" : "") + "</strong>" +
+      (parentNeed ? '<small>먼저 ' + traitById(t.from).name + " 노드가 필요해요</small>" : "") + bars + "</span>" + (on ? "<b>획득</b>" : "") + "</div>";
+  }
+  function evoPreview(p) {
+    if (p.stage === 3) {
+      const t = traitById(p.evoNode);
+      return t ? '<p class="evo-line">' + icon("star") + " " + t.name + "의 길 · " + types[p.type].branches[p.branch || 0] + "</p>" : "";
+    }
+    const plan = evoPlan(p);
+    if (p.stage < 2) return '<p class="evo-line muted">성장기가 되면 진화 경로가 보여요.</p>';
+    if (!plan.ok) return '<p class="evo-line muted">' + icon("neuron") + " 성향 노드 " + plan.got.length + "/2 — 2개를 얻으면 진화할 수 있어요.</p>";
+    return '<p class="evo-line">' + icon("spark") + " 지금 진화하면 <b>" + plan.main.name + "의 길</b> → " + types[p.type].branches[plan.branch] + "</p>";
+  }
+  function traitChips(p) {
+    const got = TRAITS.filter((t) => hasTrait(p, t));
+    return '<div class="trait-chips">' + (got.length ? got.map((t) => '<span style="--c:' + t.color + '" title="' + t.name + '">' + icon(t.icon) + "</span>").join("") : '<em>아직 얻은 성향 노드가 없어요</em>') + '<a href="#traits" class="text-link">트리 ' + icon("arrow") + "</a></div>";
   }
   function traits() {
     const p = selected();
-    const got = TRAITS.filter((t) => p.stage > 0 && t.ok(p));
+    syncTraits(p);
+    const got = TRAITS.filter((t) => hasTrait(p, t));
     return (
-      heading("", "성향 트리", "돌봄 경험이 쌓이면 성향 노드를 얻어요. 노드에 마우스를 올리면 조건이 보여요.",
+      heading("", "성향 진화 트리", "상호작용이 쌓이면 성향 노드를 얻고, 진화할 때 가장 깊게 자란 노드의 길을 따라 갈래가 정해져요.",
         '<div class="date-chip">' + icon("spark") + got.length + " / " + TRAITS.length + " 획득</div>") +
       '<div class="filter-row">' +
       state.pets.filter((q) => q.owner !== "escrow").map((q) =>
         '<button class="filter-button ' + (q.id === p.id ? "active" : "") + '" data-action="select" data-pet="' + q.id + '">' + esc(q.name) + "</button>").join("") +
       "</div>" +
       '<section class="panel tree-panel">' + traitTree(p) +
-      '<div class="tt-legend"><span><i class="lg on"></i>획득한 성향</span><span><i class="lg off"></i>아직 얻지 못한 성향</span><span><i class="lg lock"></i>진화 후 공개</span>' +
-      '<span class="tt-exp">먹이 ' + (p.feeds || 0) + " · 놀기 " + (p.plays || 0) + " · 쉬기 " + (p.rests || 0) + " · 친밀도 " + Math.round(p.stats.friendship) + "</span></div></section>" +
-      '<div class="trait-list">' + TRAITS.map((t) => {
-        const on = p.stage > 0 && t.ok(p);
-        return '<div class="trait-item ' + (on ? "on" : "") + '" style="--c:' + t.color + '"><span class="ti-icon">' + icon(t.icon) + "</span><span><strong>" + t.name + "</strong><small>" + t.rule + "</small></span>" + (on ? '<b>획득</b>' : "") + "</div>";
-      }).join("") + "</div>"
+      '<div class="tt-legend"><span><i class="lg on"></i>획득한 성향</span><span><i class="lg evo"></i>진화 경로</span><span><i class="lg off"></i>아직 얻지 못한 성향</span><span><i class="lg lock"></i>추후 진화 가능</span>' +
+      '<span class="tt-exp">' + evoPreview(p) + "</span></div></section>" +
+      '<div class="trait-list">' + TRAITS.map((t) => traitItem(p, t)).join("") + "</div>"
     );
+  }
+
+  /* 진화 연출: 트리 경로가 빛나고 → 캐릭터가 번쩍이며 → 진화한 모습 */
+  function evolveScene(p, beforeName) {
+    const t = traitById(p.evoNode);
+    openDialog(
+      "진화의 순간",
+      '<div class="evo-scene" id="evo-scene">' +
+        '<div class="evo-tree">' + traitTree(p, { anim: true, noRoot: true }) + "</div>" +
+        '<div class="evo-stage"><div class="evo-pet" id="evo-pet">' + img(beforeName, p.name) + "</div></div>" +
+        '<p class="evo-caption" id="evo-caption">' + esc(p.name) + "의 성향 노드가 빛나요…</p>" +
+        "</div>" +
+        '<div id="evo-done" hidden>' + button("close", "좋아, 함께하자", "primary wide") + "</div>",
+    );
+    const reduceM = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const scene = $("#evo-scene");
+    setTimeout(() => scene && scene.classList.add("lit"), 50);
+    setTimeout(() => { const e = $("#evo-pet"); if (e) e.classList.add("flash"); const c = $("#evo-caption"); if (c) c.textContent = t.name + "의 길을 따라 모습이 바뀌어요!"; }, reduceM ? 100 : 1700);
+    setTimeout(() => {
+      const e = $("#evo-pet");
+      if (e) { e.innerHTML = petSprite(p); e.classList.remove("flash"); e.classList.add("reveal"); }
+      const c = $("#evo-caption");
+      if (c) c.innerHTML = esc(p.name) + "가 <b>" + types[p.type].branches[p.branch] + "</b>(으)로 진화했어요.<br><small>" + t.name + "의 길 · 획득 노드 " + (p.evoPath || []).map((id) => traitById(id).name).join("·") + "</small>";
+      const d = $("#evo-done"); if (d) d.hidden = false;
+      chirp();
+    }, reduceM ? 200 : 2900);
   }
   function dating() {
     const candidates = state.pets.filter(
@@ -1570,6 +1732,10 @@
       toast("이미 마지막 단계예요.");
       return false;
     }
+    if (p.stage === 2 && !evoPlan(p).ok) {
+      toast("진화하려면 성향 노드가 2개 필요해요. 지금 " + evoPlan(p).got.length + "개예요.");
+      return false;
+    }
     const wait = Math.ceil((p.changedAt + 3000 - Date.now()) / 1000);
     if (wait > 0) {
       toast("조금만 기다려 주세요. " + wait + "초 뒤에 성장할 수 있어요.");
@@ -1619,12 +1785,22 @@
   function grow(p) {
     if (!checkGrowth(p)) return;
     if (p.stage === 0) return hatch(p);
+    if (p.stage === 2) {
+      const plan = evoPlan(p), before = spriteName(p);
+      syncTraits(p);
+      p.stage = 3;
+      p.changedAt = Date.now();
+      p.branch = plan.branch;
+      p.evoNode = plan.main.id;
+      p.evoPath = plan.got.map((t) => t.id);
+      addLog(p.name + "가 " + plan.main.name + "의 길을 따라 " + types[p.type].branches[p.branch] + "(으)로 진화했어요.");
+      save();
+      render();
+      evolveScene(p, before);
+      return;
+    }
     p.stage++;
     p.changedAt = Date.now();
-    if (p.stage === 3) {
-      const t = temper(brainOf(p));
-      p.branch = t[0] + t[2] >= t[1] + t[3] ? 0 : 1;
-    }
     addLog(p.name + "가 " + stageNames[p.stage] + " 단계로 자랐어요.");
     save();
     chirp();
@@ -1828,14 +2004,9 @@
         0,
         Math.ceil((current.changedAt + 3000 - Date.now()) / 1000),
       );
-      growButton.innerHTML =
-        esc(
-          n > 0
-            ? n + "초 후 성장"
-            : current.stage === 0
-              ? "부화시키기"
-              : "성장하기",
-        ) + icon("arrow");
+      const g = growLabel(current);
+      growButton.innerHTML = esc(g.text) + icon("arrow");
+      growButton.disabled = g.off;
     }
     if (
       route === "dating" &&
@@ -2081,6 +2252,7 @@
   });
   function readRoute() {
     const hash = location.hash.slice(1);
+    if (dialog.open) dialog.close();
     route = ["home", "collection", "traits", "dating", "eggs", "family"].includes(hash)
       ? hash
       : "home";

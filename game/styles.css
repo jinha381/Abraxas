@@ -569,3 +569,73 @@ body.night .tt-node.on .tt-label text { fill: #4a4770; }
   .navigation a { min-height: 44px; }
   .topbar-actions { gap: 6px; flex-wrap: wrap; }
 }
+
+/* ---------- 성향 진화 트리 v5: 육각 노드 · 진화 경로 ---------- */
+.trait-tree { shape-rendering: auto; }
+.tt-line { fill: none; stroke: var(--paper-3); stroke-width: 6; stroke-dasharray: 6 8; stroke-linecap: square; stroke-linejoin: miter; }
+.tt-line.on { stroke: #d9c27e; stroke-width: 9; stroke-dasharray: none; }
+.tt-lines .tt-line.on { stroke: #d9c27e; }
+.tt-line.evo, .tt-lines .tt-line.evo { stroke: #f3dc8c; stroke-width: 13; stroke-dasharray: none; filter: drop-shadow(0 0 6px rgba(243, 220, 140, .9)); }
+.tt-line.locked { stroke: var(--paper-3); stroke-width: 4; stroke-dasharray: 4 7; }
+.tt-line.next { stroke: #e3cd8a; stroke-width: 5; stroke-dasharray: 8 6; }
+.tt-junction { fill: #b9d39c; stroke: var(--line); stroke-width: 3; }
+.tt-box { fill: var(--c); stroke: var(--line); stroke-width: 4; stroke-linejoin: miter; }
+.tt-shadow { fill: var(--drop); }
+.tt-icon { fill: #fff; stroke: none; }
+.tt-node.off .tt-box { fill: var(--paper-2); stroke: var(--muted); stroke-dasharray: 7 5; }
+.tt-node.off .tt-icon { fill: var(--muted); }
+.tt-node.off .tt-shadow { fill: transparent; }
+.tt-node.main .tt-box { stroke-width: 5; filter: drop-shadow(0 0 8px rgba(243, 220, 140, .95)); }
+.tt-crown polygon { fill: #f3dc8c; stroke: var(--line); stroke-width: 3; stroke-linejoin: miter; }
+.tt-badge rect { fill: var(--teal); stroke: var(--line); stroke-width: 3; }
+.tt-badge path { fill: none; stroke: #fff; stroke-width: 3; }
+.tt-label rect { fill: var(--paper); stroke: var(--line); stroke-width: 3; rx: 0; }
+.tt-node.on .tt-label rect { fill: var(--butter); }
+.tt-node.main .tt-label rect { fill: #f3dc8c; }
+.tt-kid polygon { fill: var(--paper-2); stroke: var(--muted); stroke-width: 3; stroke-dasharray: 4 4; }
+.tt-kid .tt-kid-icon { fill: var(--muted); opacity: .7; }
+.tt-kid.next polygon { fill: #f7efcd; stroke: #c9ad5a; stroke-dasharray: 5 4; }
+body.night .tt-kid.next polygon { fill: #5a5480; }
+.tt-kid.next .tt-kid-icon { fill: #c9ad5a; opacity: 1; animation: blinkdot 1.2s steps(2) infinite; }
+.lg.evo { background: #f3dc8c; box-shadow: var(--px2), 0 0 6px rgba(243, 220, 140, .9); }
+.tt-exp { margin-left: auto; }
+.evo-line { display: flex; align-items: center; gap: 6px; margin: 10px 0 4px; font-size: 12px; color: var(--ink); }
+.evo-line b { color: var(--lilac-d); }
+body.night .evo-line b { color: #c9bdf0; }
+.evo-line.muted { color: var(--muted); }
+.evo-line .icon { color: #c9ad5a; }
+.trait-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
+.trait-chips span { width: 26px; height: 26px; display: grid; place-items: center; color: #fff; background: var(--c); box-shadow: var(--px2); }
+.trait-chips span .icon { width: 14px; height: 14px; }
+.trait-chips em { font-style: normal; font-size: 11px; color: var(--muted); }
+.trait-chips .text-link { margin-left: auto; font-size: 11px; }
+.trait-item { align-items: flex-start; }
+.trait-item.main { background: #fbf3d6; }
+body.night .trait-item.main { background: #5a5480; }
+.ti-req { display: grid; gap: 2px; margin-top: 5px; font-size: 10px; color: var(--muted); }
+.ti-req b { color: var(--ink); }
+.ti-req i { display: block; height: 5px; background: var(--paper-3); }
+.ti-req u { display: block; height: 100%; background: var(--c); text-decoration: none; }
+
+/* 진화 연출 */
+.evo-scene { display: grid; gap: 8px; }
+.evo-tree { background: var(--paper-2); box-shadow: var(--px2); padding: 6px; }
+.evo-tree .trait-tree { max-height: 260px; }
+.tt-wrap.anim .tt-line.evo { stroke-dasharray: 900; stroke-dashoffset: 900; }
+.tt-wrap.anim .tt-node.main { opacity: .35; }
+.evo-scene.lit .tt-wrap.anim .tt-line.evo { animation: evo-draw 1.5s steps(15) forwards; }
+.evo-scene.lit .tt-wrap.anim .tt-node.main { animation: evo-node .5s steps(4) 1.3s forwards; }
+@keyframes evo-draw { to { stroke-dashoffset: 0; } }
+@keyframes evo-node { 0% { opacity: .35; } 60% { opacity: 1; transform-box: fill-box; } 100% { opacity: 1; } }
+.evo-stage { position: relative; display: grid; place-items: center; min-height: 170px; background: linear-gradient(var(--sky-2) 0 40%, var(--sky-4) 40% 72%, var(--grass) 72%); box-shadow: var(--px2); overflow: hidden; }
+.evo-pet .sprite { width: min(230px, 70%); margin: 0 auto; }
+.evo-pet { width: 100%; display: grid; place-items: center; }
+.evo-pet.flash .sprite { animation: evo-flash 1.2s steps(6) forwards; }
+@keyframes evo-flash { 0% { filter: none; } 30% { filter: brightness(1.8); } 50% { filter: brightness(3) saturate(0); transform: scale(1.05); } 100% { filter: brightness(6) saturate(0); transform: scale(.9); opacity: .9; } }
+.evo-pet.reveal .sprite { animation: evo-reveal .7s steps(5) both; }
+@keyframes evo-reveal { 0% { filter: brightness(6) saturate(0); transform: scale(.85); } 60% { transform: scale(1.06); } 100% { filter: none; transform: scale(1); } }
+.evo-caption { text-align: center; font-size: 13px; min-height: 40px; }
+.evo-caption small { color: var(--muted); font-size: 11px; }
+@media (max-width: 760px) { .tt-exp { margin-left: 0; } }
+.trait-item .ti-req b { padding: 0; background: none; box-shadow: none; color: var(--ink); font-size: 10px; }
+@media (max-width: 760px) { .tt-root { width: 15%; } .tt-root .name-tag { display: none; } }
