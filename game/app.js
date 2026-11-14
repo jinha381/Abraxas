@@ -16,7 +16,7 @@
         })[c],
     );
   const clamp = (n) => Math.max(0, Math.min(100, Number(n) || 0));
-  const wallets = ["dewey", "axie", "kitty", "tama"];
+  const wallets = ["user1", "user2", "user3", "user4"];
   const types = [
     {
       name: "탐색형",
@@ -220,7 +220,7 @@
     const now = Date.now();
     return {
       version: 1,
-      wallet: "dewey",
+      wallet: "user1",
       selected: "founder-0",
       food: 12,
       night: false,
@@ -255,7 +255,7 @@
   let state;
   try {
     const saved = JSON.parse(
-      localStorage.getItem("hatchmind-garden-v3") || "null",
+      localStorage.getItem("hatchmind-garden-v4") || "null",
     );
     const valid =
       saved?.version === 1 &&
@@ -285,7 +285,7 @@
     dialog = $("#dialog");
   function save() {
     try {
-      localStorage.setItem("hatchmind-garden-v3", JSON.stringify(state));
+      localStorage.setItem("hatchmind-garden-v4", JSON.stringify(state));
     } catch {
       /* The demo remains usable when browser storage is unavailable. */
     }
@@ -1261,16 +1261,34 @@
   function parentPt(t) {
     return t.from === "J1" ? TJ.J1 : t.from === "J2" ? TJ.J2 : [traitById(t.from).x, traitById(t.from).y];
   }
-  const hexPts = (r) => {
-    const pts = [];
-    for (let i = 0; i < 6; i++) {
-      const a = (Math.PI / 3) * i + Math.PI / 6;
-      pts.push(Math.round(Math.cos(a) * r) + "," + Math.round(Math.sin(a) * r));
-    }
-    return pts.join(" ");
+  const stepPoly = (rows, u) => {
+    if (!rows.length) return "";
+    const right = [], left = [];
+    rows.forEach(([y, hw]) => {
+      right.push(hw + " " + y, hw + " " + (y + u));
+      left.unshift(-hw + " " + (y + u), -hw + " " + y);
+    });
+    return "M" + right.concat(left).join(" L") + "Z";
   };
+  const hexPath = (r, u = 4) => {
+    const rows = [], W = (Math.sqrt(3) * r) / 2;
+    for (let y = -r; y < r; y += u) {
+      const ay = Math.abs(y + u / 2);
+      let hw = ay <= r / 2 ? W : (W * (r - ay)) / (r / 2);
+      hw = Math.round(hw / u) * u;
+      if (hw > 0) rows.push([y, hw]);
+    }
+    return stepPoly(rows, u);
+  };
+  const diamondPath = (r, u = 4) => {
+    const rows = [];
+    for (let y = -r; y < r; y += u) rows.push([y, Math.max(u, Math.round((r - Math.abs(y + u / 2)) / u) * u)]);
+    return stepPoly(rows, u);
+  };
+  const pxHex = (r, cls, extra = "") =>
+    '<path class="' + cls + '-out" d="' + hexPath(r) + '"' + extra + '/><path class="' + cls + '" d="' + hexPath(r - 6) + '"' + extra + "/>";
   const step = (a, b) => {
-    const my = Math.round((a[1] + b[1]) / 2);
+    const my = Math.round((a[1] + b[1]) / 8) * 4;
     return "M" + a[0] + " " + a[1] + " L" + a[0] + " " + my + " L" + b[0] + " " + my + " L" + b[0] + " " + b[1];
   };
   function traitTree(p, opt = {}) {
@@ -1278,32 +1296,37 @@
     const got = TRAITS.map((t) => hasTrait(p, t));
     const pathOf = (t) => (t && t.from !== "J1" && t.from !== "J2" ? [...pathOf(traitById(t.from)), t.id] : t ? [t.id] : []);
     const evoPath = evoId ? pathOf(traitById(evoId)) : [];
-    let lines = "", kids = "", nodes = "";
+    let lines = "", glow = "", kids = "", nodes = "";
     const trunkOn = got.some(Boolean);
     lines += '<path class="tt-line ' + (trunkOn ? "on" : "") + (evoPath.length ? " evo" : "") + '" d="M' + TJ.R[0] + " " + TJ.R[1] + " L" + TJ.J1[0] + " " + TJ.J1[1] + '"/>';
     const upOn = TRAITS.some((t, i) => got[i] && (t.from === "J2" || (t.from !== "J1" && traitById(t.from).from === "J2")));
     const upEvo = evoPath.length && traitById(evoPath[0]).from === "J2";
     lines += '<path class="tt-line ' + (upOn ? "on" : "") + (upEvo ? " evo" : "") + '" d="M' + TJ.J1[0] + " " + TJ.J1[1] + " L" + TJ.J2[0] + " " + TJ.J2[1] + '"/>';
+    if (evoPath.length) glow += '<path class="tt-glow" d="M' + TJ.R[0] + " " + TJ.R[1] + " L" + TJ.J1[0] + " " + TJ.J1[1] + '"/>';
+    if (upEvo) glow += '<path class="tt-glow" d="M' + TJ.J1[0] + " " + TJ.J1[1] + " L" + TJ.J2[0] + " " + TJ.J2[1] + '"/>';
+    if (evoPath.length > 1) glow += '<path class="tt-glow" d="' + step(parentPt(traitById(evoPath[0])), [traitById(evoPath[0]).x, traitById(evoPath[0]).y]) + '"/>';
     TRAITS.forEach((t, i) => {
       const on = got[i], evo = evoPath.includes(t.id), isMain = t.id === evoId;
       lines += '<path class="tt-line ' + (on ? "on" : "") + (evo ? " evo" : "") + '" d="' + step(parentPt(t), [t.x, t.y]) + '"/>';
+      if (evo) glow += '<path class="tt-glow" d="' + step(parentPt(t), [t.x, t.y]) + '"/>';
       t.kids.forEach(([kx, ky]) => {
         const next = isMain && p.stage === 3;
-        lines += '<path class="tt-line ' + (next ? "next" : "locked") + '" d="M' + t.x + " " + t.y + " L" + kx + " " + ky + '"/>';
-        kids += '<g class="tt-kid' + (next ? " next" : "") + '" transform="translate(' + kx + " " + ky + ')"><title>' + (next ? "다음 진화 노드 · 준비 중" : "추후 진화 가능") + '</title><polygon points="' + hexPts(19) + '"/><use href="#i-' + (next ? "spark" : "spark") + '" x="-7" y="-7" width="14" height="14" class="tt-kid-icon"/></g>';
+        lines += '<path class="tt-line ' + (next ? "next" : "locked") + '" d="' + step([t.x, t.y], [kx, ky]) + '"/>';
+        kids += '<g class="tt-kid' + (next ? " next" : "") + '" transform="translate(' + kx + " " + ky + ')"><title>' + (next ? "다음 진화 노드 · 준비 중" : "추후 진화 가능") + "</title>" + pxHex(20, "tk") + '<use href="#i-spark" x="-6" y="-6" width="12" height="12" class="tt-kid-icon"/></g>';
       });
       const prog = t.req.map(([label, f, goal, fmt]) => label + " " + (fmt ? fmt(f(p)) : f(p)) + "/" + (fmt ? fmt(goal) : goal)).join(" · ");
       nodes += '<g class="tt-node ' + (on ? "on" : "off") + (isMain ? " main" : "") + '" data-node="' + t.id + '" transform="translate(' + t.x + " " + t.y + ')" style="--c:' + t.color + '"><title>' + t.name + " · " + prog + '</title>' +
-        '<polygon points="' + hexPts(36) + '" class="tt-shadow" transform="translate(0 5)"/><polygon points="' + hexPts(36) + '" class="tt-box"/>' +
-        '<use href="#i-' + t.icon + '" x="-14" y="-14" width="28" height="28" class="tt-icon"/>' +
-        (isMain ? '<g class="tt-crown" transform="translate(0 -46)"><polygon points="-14,6 -14,-6 -7,0 0,-9 7,0 14,-6 14,6"/></g>' : on ? '<g class="tt-badge" transform="translate(27 -26)"><rect x="-9" y="-9" width="18" height="18"/><path d="M-5 0l3 3 6-6"/></g>' : "") +
+        (isMain ? '<path class="tt-halo" d="' + hexPath(50) + '"/>' : "") +
+        '<path class="tt-shadow" d="' + hexPath(38) + '" transform="translate(0 6)"/>' + pxHex(38, "tt-box") +
+        '<use href="#i-' + t.icon + '" x="-12" y="-12" width="24" height="24" class="tt-icon"/>' +
+        (isMain ? '<path class="tt-crown" transform="translate(-16 -62)" d="M0 8h4v4h-4zM14 0h4v12h-4zM28 8h4v4h-4zM4 12h24v4h-24zM0 16h32v8h-32z"/>' : on ? '<g class="tt-badge" transform="translate(24 -32)"><rect x="-10" y="-10" width="20" height="20"/><path d="M-6 0h3v3h-3zM-3 3h3v3h-3zM0 0h3v3h-3zM3 -3h3v3h-3z"/></g>' : "") +
         '<g class="tt-label" transform="translate(0 52)"><rect x="-38" y="-14" width="76" height="26"/><text y="5">' + t.name + "</text></g></g>";
     });
     const count = got.filter(Boolean).length;
     return (
       '<div class="tt-wrap' + (opt.anim ? " anim" : "") + '"><svg class="trait-tree" viewBox="0 0 1000 640" role="img" aria-label="' + esc(p.name) + "의 성향 진화 트리, " + count + "개 획득\">" +
-      '<g class="tt-lines">' + lines + "</g>" + kids + nodes +
-      ["J1", "J2"].map((j) => '<rect class="tt-junction" x="' + (TJ[j][0] - 10) + '" y="' + (TJ[j][1] - 10) + '" width="20" height="20" transform="rotate(45 ' + TJ[j][0] + " " + TJ[j][1] + ')"/>').join("") +
+      '<g class="tt-glows">' + glow + '</g><g class="tt-lines">' + lines + "</g>" + kids + nodes +
+      ["J1", "J2"].map((j) => '<g transform="translate(' + TJ[j][0] + " " + TJ[j][1] + ')"><path class="tt-junction-out" d="' + diamondPath(16) + '"/><path class="tt-junction" d="' + diamondPath(10) + '"/></g>').join("") +
       "</svg>" +
       (opt.noRoot ? "" : '<div class="tt-root">' + petSprite(p) + '<span class="name-tag">' + esc(p.name) + " · " + types[p.type].name + "</span></div>") +
       "</div>"
@@ -1633,7 +1656,7 @@
         family: "우리의 이야기",
       }[route] || "나의 정원";
     $("#wallet-select").value = state.wallet;
-    $("#wallet-avatar").textContent = state.wallet[0].toUpperCase();
+    $("#wallet-avatar").textContent = state.wallet.replace("user", "");
     $("#pet-count").textContent = state.pets.length;
     $("#egg-count").textContent = mine().filter((p) => p.stage === 0).length;
     $("#theme-button").innerHTML = icon(state.night ? "sun" : "moon");
@@ -2121,7 +2144,7 @@
       case "about":
         openDialog(
           "체험 모드 안내",
-          "<p>HatchMind 게임 화면 체험이에요. 정원에서 쓰다듬기·먹이·놀이·부르기·산책·재우기로 뉴로링과 상호작용하면, 그 입력이 커넥톰 회로를 학습시켜 반응과 기질이 바뀌어요. 성장, 교배 동의, 알 선물과 회수도 체험할 수 있어요.</p><p>혼자 플레이하는 게임이에요. 위쪽 메뉴의 dewey·axie·kitty·tama는 이 기기 안의 플레이 그룹이며 다른 유저 계정이 아니에요. 만남과 선물도 같은 브라우저에서만 체험하고, 실제 지갑 연결이나 블록체인 거래는 발생하지 않아요. 진행 상황은 각자의 브라우저에만 저장되며 다른 기기로 자동 동기화되지 않아요.</p>" +
+          "<p>HatchMind 게임 화면 체험이에요. 정원에서 쓰다듬기·먹이·놀이·부르기·산책·재우기로 뉴로링과 상호작용하면, 그 입력이 커넥톰 회로를 학습시켜 반응과 기질이 바뀌어요. 성장, 교배 동의, 알 선물과 회수도 체험할 수 있어요.</p><p>혼자 플레이하는 게임이에요. 위쪽 메뉴의 user1~user4는 이 기기 안의 플레이 계정이며, 각 계정이 뉴로링 한 마리(듀이·셸리·피치·액시)로 시작해요. 다른 유저와 연결되지는 않아요. 만남과 선물도 같은 브라우저에서만 체험하고, 실제 지갑 연결이나 블록체인 거래는 발생하지 않아요. 진행 상황은 각자의 브라우저에만 저장되며 다른 기기로 자동 동기화되지 않아요.</p>" +
             button("close", "닫기", "primary wide"),
         );
         break;

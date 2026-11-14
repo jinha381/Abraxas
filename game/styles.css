@@ -639,3 +639,35 @@ body.night .trait-item.main { background: #5a5480; }
 @media (max-width: 760px) { .tt-exp { margin-left: 0; } }
 .trait-item .ti-req b { padding: 0; background: none; box-shadow: none; color: var(--ink); font-size: 10px; }
 @media (max-width: 760px) { .tt-root { width: 15%; } .tt-root .name-tag { display: none; } }
+
+/* ---------- 성향 트리: 도트 그래픽 유지 ---------- */
+.trait-tree { shape-rendering: crispEdges; }
+.tt-line, .tt-lines .tt-line { stroke-linecap: butt; filter: none; }
+.tt-line.on, .tt-lines .tt-line.on { stroke: #d9c27e; stroke-width: 8; }
+.tt-line.evo, .tt-lines .tt-line.evo { stroke: #f3dc8c; stroke-width: 12; filter: none; }
+.tt-glow { fill: none; stroke: rgba(246, 230, 166, .55); stroke-width: 28; }
+.tt-line.locked { stroke-width: 4; stroke-dasharray: 4 8; }
+.tt-line.next { stroke-width: 4; stroke-dasharray: 8 8; }
+.tt-box-out { fill: var(--line); }
+.tt-box { fill: var(--c); stroke: none; }
+.tt-node.off .tt-box-out { fill: var(--muted); opacity: .55; }
+.tt-node.off .tt-box { fill: var(--paper-2); stroke: none; }
+.tt-node.main .tt-box { filter: none; }
+.tt-halo { fill: rgba(246, 230, 166, .6); }
+.tt-shadow { fill: var(--drop); }
+.tt-node.off .tt-shadow { fill: transparent; }
+.tt-crown { fill: #f3dc8c; stroke: var(--line); stroke-width: 2; }
+.tt-badge rect { fill: var(--teal); stroke: var(--line); stroke-width: 3; }
+.tt-badge path { fill: #fff; stroke: none; }
+.tk-out { fill: var(--muted); opacity: .45; }
+.tk { fill: var(--paper-2); }
+.tt-kid .tt-kid-icon { fill: var(--muted); opacity: .8; }
+.tt-kid.next .tk-out { fill: #c9ad5a; opacity: 1; }
+.tt-kid.next .tk { fill: #f7efcd; }
+body.night .tt-kid.next .tk { fill: #5a5480; }
+.tt-junction-out { fill: var(--line); }
+.tt-junction { fill: #b9d39c; stroke: none; }
+.lg.evo { box-shadow: var(--px2); }
+.tt-wrap.anim .tt-glow { opacity: 0; }
+.evo-scene.lit .tt-wrap.anim .tt-glow { animation: evo-glow .4s steps(2) 1.3s forwards; }
+@keyframes evo-glow { to { opacity: 1; } }
