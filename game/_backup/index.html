@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#f6f5ef" />
+    <meta
+      name="description"
+      content="HatchMind — 작은 친구들과 천천히 자라는 나만의 숲."
+    />
+    <title>HatchMind · 나의 작은 숲</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <svg
+      class="icon-definitions"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <defs>
+        <symbol id="i-leaf" viewBox="0 0 24 24">
+          <path
+            d="M12 21v-9M12 15C4 15 2 9 3 3c6 0 10 3 9 9M12 11c0-6 4-9 10-9 0 6-3 10-10 10"
+          />
+        </symbol>
+        <symbol id="i-home" viewBox="0 0 24 24">
+          <path d="m3 10 9-7 9 7v10H3zM9 20v-7h6v7" />
+        </symbol>
+        <symbol id="i-heart" viewBox="0 0 24 24">
+          <path
+            d="M20 5c-3-3-7-1-8 2-2-3-6-5-9-1-4 5 5 11 9 15 4-4 12-11 8-16Z"
+          />
+        </symbol>
+        <symbol id="i-egg" viewBox="0 0 24 24">
+          <path d="M20 15a8 8 0 0 1-16 0C4 9 9 2 12 2s8 7 8 13Z" />
+          <path d="m8 15 3-2 2 2 3-2" />
+        </symbol>
+        <symbol id="i-grid" viewBox="0 0 24 24">
+          <rect x="3" y="3" width="7" height="7" rx="2" />
+          <rect x="14" y="3" width="7" height="7" rx="2" />
+          <rect x="3" y="14" width="7" height="7" rx="2" />
+          <rect x="14" y="14" width="7" height="7" rx="2" />
+        </symbol>
+        <symbol id="i-branch" viewBox="0 0 24 24">
+          <circle cx="6" cy="5" r="3" />
+          <circle cx="18" cy="5" r="3" />
+          <circle cx="12" cy="19" r="3" />
+          <path d="M6 8v4h12V8m-6 4v4" />
+        </symbol>
+        <symbol id="i-arrow" viewBox="0 0 24 24">
+          <path d="M4 12h15m-6-6 6 6-6 6" />
+        </symbol>
+        <symbol id="i-chevron" viewBox="0 0 24 24">
+          <path d="m8 4 8 8-8 8" />
+        </symbol>
+        <symbol id="i-carrot" viewBox="0 0 24 24">
+          <path
+            d="M15 8c-2-2-4-1-5 1L3 21l13-6c3-2 2-5-1-7ZM9 11l3 3m-5 1 2 2M16 8l4-5m-3 4 5 1m-6-2-1-4"
+          />
+        </symbol>
+        <symbol id="i-spark" viewBox="0 0 24 24">
+          <path d="m12 2 3 7 7 3-7 3-3 7-3-7-7-3 7-3 3-7Z" />
+        </symbol>
+        <symbol id="i-sun" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="4" />
+          <path
+            d="M12 1v2m0 18v2M1 12h2m18 0h2M4 4l2 2m12 12 2 2M4 20l2-2M18 6l2-2"
+          />
+        </symbol>
+        <symbol id="i-moon" viewBox="0 0 24 24">
+          <path d="M21 14A9 9 0 0 1 10 3a9 9 0 1 0 11 11Z" />
+        </symbol>
+        <symbol id="i-volume" viewBox="0 0 24 24">
+          <path
+            d="M3 9h4l5-5v16l-5-5H3zM16 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"
+          />
+        </symbol>
+        <symbol id="i-check" viewBox="0 0 24 24">
+          <path d="m5 12 4 4L20 5" />
+        </symbol>
+        <symbol id="i-gift" viewBox="0 0 24 24">
+          <path d="M3 8h18v5H3zM5 13v8h14v-8M12 8v13" />
+          <path d="M12 8C4 8 5 1 8 3c2 0 4 5 4 5s2-5 4-5c4-1 4 5-4 5Z" />
+        </symbol>
+        <symbol id="i-close" viewBox="0 0 24 24">
+          <path d="m6 6 12 12M6 18 18 6" />
+        </symbol>
+        <symbol id="i-clock" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 6v6l4 2" />
+        </symbol>
+        <symbol id="i-plus" viewBox="0 0 24 24">
+          <path d="M12 4v16M4 12h16" />
+        </symbol>
+        <symbol id="i-wallet" viewBox="0 0 24 24">
+          <path d="M20 7H4V3h15v4M4 7v14h17V7M21 12h-6v5h6" />
+        </symbol>
+      </defs>
+    </svg>
+
+    <aside class="sidebar">
+      <a href="#home" class="brand"
+        ><span class="brand-mark"
+          ><svg class="icon"><use href="#i-leaf" /></svg></span
+        ><span>HatchMind<small>A LITTLE LIFE, A LITTLE CLOSER</small></span></a
+      >
+      <div class="sidebar-section">나의 작은 세계</div>
+      <nav class="navigation" aria-label="주 메뉴">
+        <a href="#home" data-route="home"
+          ><svg class="icon"><use href="#i-home" /></svg><span>나의 정원</span
+          ><i class="nav-dot"></i
+        ></a>
+        <a href="#collection" data-route="collection"
+          ><svg class="icon"><use href="#i-grid" /></svg><span>작은 친구들</span
+          ><b id="pet-count">4</b></a
+        >
+        <a href="#dating" data-route="dating"
+          ><svg class="icon"><use href="#i-heart" /></svg
+          ><span>새로운 만남</span></a
+        >
+        <a href="#eggs" data-route="eggs"
+          ><svg class="icon"><use href="#i-egg" /></svg><span>알 보관함</span
+          ><b id="egg-count">0</b></a
+        >
+        <a href="#family" data-route="family"
+          ><svg class="icon"><use href="#i-branch" /></svg
+          ><span>우리의 이야기</span></a
+        >
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="seed-note">
+          <span class="small-eyebrow">A NEW BEGINNING</span>
+          <div id="sidebar-egg"></div>
+          <strong>작은 알, 커다란 인연.</strong>
+          <p>새로운 생명은<br />새로운 친구의 시작이에요.</p>
+          <a href="#eggs"
+            >알 보관함 열기 <svg class="icon"><use href="#i-arrow" /></svg
+          ></a>
+        </div>
+        <div class="demo-note">
+          <span class="status-dot"></span> 로컬 체험 모드<button
+            data-action="about"
+            aria-label="체험 모드 안내"
+          >
+            ⓘ
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="breadcrumb">
+          나의 작은 세계 <span>/</span> <b id="breadcrumb-title">나의 정원</b>
+        </div>
+        <div class="topbar-actions">
+          <button
+            class="icon-button"
+            id="sound-button"
+            data-action="sound"
+            aria-label="효과음 켜기"
+            aria-pressed="false"
+          >
+            <svg class="icon"><use href="#i-volume" /></svg>
+          </button>
+          <button
+            class="icon-button"
+            id="theme-button"
+            data-action="theme"
+            aria-label="밤 풍경으로 바꾸기"
+          >
+            <svg class="icon"><use href="#i-moon" /></svg>
+          </button>
+          <span class="topbar-divider"></span>
+          <label class="wallet-switch"
+            ><span class="wallet-avatar" id="wallet-avatar">D</span
+            ><select id="wallet-select" aria-label="체험할 지갑 역할 선택">
+              <option value="dewey">dewey의 정원</option>
+              <option value="axie">axie의 정원</option>
+              <option value="kitty">kitty의 정원</option>
+              <option value="tama">tama의 정원</option>
+            </select></label
+          >
+        </div>
+      </header>
+      <main id="main" tabindex="-1"></main>
+      <footer class="page-footer">
+        <span>천천히 자라도 괜찮아요. 함께니까요.</span
+        ><span>HatchMind <i>✦</i> 작은 생명의 연결</span>
+      </footer>
+    </div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <dialog id="dialog"><div id="dialog-content"></div></dialog>
+    <noscript
+      >친구들과 상호작용하려면 브라우저의 JavaScript를 켜 주세요.</noscript
+    >
+  </body>
+</html>

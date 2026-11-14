@@ -128,3 +128,9 @@ yarn typecheck
 hatchmind.code-workspace를 열면 됩니다. 작업 실행 메뉴에서 HatchMind: all local checks (WSL)를 선택하면 전체 검증을 실행합니다. Git 저장소는 https://github.com/jinha381/Abraxas에 연결되어 있으며 main 브랜치로 관리합니다.
 
 개인키는 .local과 target 안에만 생성되며 Git에서 제외됩니다. 테스트의 네 역할 지갑은 매 실행마다 메모리에서 새로 생성됩니다.
+
+## 게임 화면 HTML
+
+[game/index.html](game/index.html)을 브라우저에서 직접 열면 그래픽 원본 9개를 사용한 작은 숲 화면을 체험할 수 있습니다. 실행 방법과 구현 범위는 [game/README.md](game/README.md)에 정리했습니다. Node가 있으면 프로젝트 루트에서 `node game/server.cjs`로 로컬 미리보기를 실행할 수도 있습니다.
+
+브라우저 안의 화면 체험이며, 실제 지갑 서명이나 온체인 거래는 연결하지 않았습니다.
