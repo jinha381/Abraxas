@@ -17,6 +17,12 @@
     );
   const clamp = (n) => Math.max(0, Math.min(100, Number(n) || 0));
   const wallets = ["user1", "user2", "user3", "user4"];
+  const starterPets = [
+    { name: "듀이", species: "토끼", owner: "user1" },
+    { name: "셸리", species: "거북", owner: "user2" },
+    { name: "피치", species: "기니피그", owner: "user3" },
+    { name: "액시", species: "족제비", owner: "user4" },
+  ];
   const types = [
     {
       name: "탐색형",
@@ -228,11 +234,11 @@
       filter: "all",
       request: null,
       gifts: [],
-      pets: ["듀이", "셸리", "피치", "액시"].map((name, type) => ({
+      pets: starterPets.map(({ name, owner }, type) => ({
         id: "founder-" + type,
         name,
         type,
-        owner: wallets[type],
+        owner,
         stage: 2,
         changedAt: now - 10000,
         birth: now,
@@ -246,7 +252,10 @@
         rests: 0,
       })),
       logs: [
-        { text: "최초 개체 4마리가 등록됐어요.", at: now - 12 * 60000 },
+        ...starterPets.map((p, i) => ({
+          text: p.owner + "의 정원에 " + p.species + " " + p.name + "가 찾아왔어요.",
+          at: now - (12 - i) * 60000,
+        })),
         { text: "듀이가 새 자극에 반응했어요.", at: now - 8 * 60000 },
         { text: "셸리가 휴식했어요.", at: now - 3 * 60000 },
       ],
@@ -654,9 +663,8 @@
       .join("");
   }
   function hud(p) {
-    const own = p.owner === state.wallet;
     return (
-      '<div class="hud-plate"><strong>' + esc(p.name) + "<span>" + stageNames[p.stage] + "</span></strong><p>" + types[p.type].name + " · " + (p.owner === "escrow" ? "선물 보관 중" : own ? "내 뉴로링" : p.owner + "의 뉴로링") + "</p></div>" +
+      '<div class="hud-plate"><strong>' + esc(p.name) + "<span>" + stageNames[p.stage] + "</span></strong><p>" + types[p.type].name + " · " + (p.owner === "escrow" ? "선물 보관 중" : esc(p.owner) + "의 뉴로링") + "</p></div>" +
       '<div class="hud-needs">' + needs(p) + "</div>"
     );
   }
@@ -1040,7 +1048,7 @@
   async function interact(verb) {
     const p = selected();
     if (route !== "home") navigate("home");
-    if (p.owner !== state.wallet) return toast("다른 지갑의 뉴로링이에요. 내 뉴로링을 골라 주세요.");
+    if (p.owner !== state.wallet) return toast("다른 계정의 뉴로링이에요. 내 뉴로링을 골라 주세요.");
     if (p.stage === 0 && verb !== "pat") return toast("알이 부화하면 함께 할 수 있어요.");
     if (stg.busy) {
       if (stg.acting) return;
@@ -1570,7 +1578,7 @@
       heading(
         "",
         "알 둥지",
-        "내 알을 부화시키거나 다른 지갑에 선물해요.",
+        "내 알을 부화시키거나 다른 계정에 선물해요.",
         button("claim-dialog", icon("gift") + " 선물 받기", "small"),
       ) + content
     );
@@ -1862,7 +1870,7 @@
     render();
     toast(
       a.owner === b.owner
-        ? "같은 지갑의 두 친구가 함께 동의했어요."
+        ? "같은 계정의 두 친구가 함께 동의했어요."
         : "상대 소유자의 동의를 기다리고 있어요.",
     );
   }
@@ -1913,7 +1921,7 @@
         p.id +
         '"><label for="gift-ttl">선물을 기다릴 시간</label><select id="gift-ttl" name="ttl"><option value="120">2분 · 화면 체험</option><option value="30">30초 · 만료와 회수 체험</option><option value="3600">1시간</option></select><button class="button primary wide" type="submit">' +
         icon("gift") +
-        ' 선물 코드 만들기</button></form><p class="dialog-caption">이 브라우저 안에서 지갑 역할을 바꿔 주고받는 체험이에요. 실제 NFT는 이동하지 않아요.</p>',
+        ' 선물 코드 만들기</button></form><p class="dialog-caption">이 브라우저 안에서 플레이 계정을 바꿔 주고받는 체험이에요. 실제 NFT는 이동하지 않아요.</p>',
     );
   }
   function createGift(form) {
@@ -1946,7 +1954,7 @@
     render();
     openDialog(
       "작은 시작을 준비했어요.",
-      '<p>친구의 지갑 역할로 전환한 뒤, 알 보관함의 <strong>선물 받기</strong>에서 아래 체험 코드를 입력해 보세요.</p><div class="code-box">' +
+      '<p>친구의 플레이 계정으로 전환한 뒤, 알 보관함의 <strong>선물 받기</strong>에서 아래 체험 코드를 입력해 보세요.</p><div class="code-box">' +
         code +
         '</div><input id="gift-code-copy" aria-label="복사할 체험 코드" readonly value="' +
         code +
@@ -1959,7 +1967,7 @@
         ) +
         button(
           "try-claim",
-          "다른 지갑으로 선물 받기 체험",
+          "다른 계정으로 선물 받기 체험",
           "wide",
           'data-code="' + code + '"',
         ) +
@@ -1988,7 +1996,7 @@
       return toast("이미 사용했거나 회수한 선물이에요.");
     if (Date.now() >= g.expires)
       return toast(
-        "선물 시간이 지났어요. 보낸 지갑에서 알을 회수할 수 있어요.",
+        "선물 시간이 지났어요. 보낸 계정에서 알을 회수할 수 있어요.",
       );
     const p = petById(g.pet);
     if (p.owner !== "escrow") return toast("선물 보관 상태를 확인해 주세요.");
@@ -2006,7 +2014,7 @@
   function reclaim(id) {
     const g = state.gifts.find((g) => g.id === id);
     if (!g || g.giver !== state.wallet)
-      return toast("선물을 보낸 지갑에서 회수할 수 있어요.");
+      return toast("선물을 보낸 계정에서 회수할 수 있어요.");
     if (g.claimed || g.reclaimed)
       return toast("이미 전달하거나 회수한 선물이에요.");
     if (Date.now() < g.expires)
@@ -2144,7 +2152,9 @@
       case "about":
         openDialog(
           "체험 모드 안내",
-          "<p>HatchMind 게임 화면 체험이에요. 정원에서 쓰다듬기·먹이·놀이·부르기·산책·재우기로 뉴로링과 상호작용하면, 그 입력이 커넥톰 회로를 학습시켜 반응과 기질이 바뀌어요. 성장, 교배 동의, 알 선물과 회수도 체험할 수 있어요.</p><p>혼자 플레이하는 게임이에요. 위쪽 메뉴의 user1~user4는 이 기기 안의 플레이 계정이며, 각 계정이 뉴로링 한 마리(듀이·셸리·피치·액시)로 시작해요. 다른 유저와 연결되지는 않아요. 만남과 선물도 같은 브라우저에서만 체험하고, 실제 지갑 연결이나 블록체인 거래는 발생하지 않아요. 진행 상황은 각자의 브라우저에만 저장되며 다른 기기로 자동 동기화되지 않아요.</p>" +
+          "<p>HatchMind 게임 화면 체험이에요. 정원에서 쓰다듬기·먹이·놀이·부르기·산책·재우기로 뉴로링과 상호작용하면, 그 입력이 커넥톰 회로를 학습시켜 반응과 기질이 바뀌어요. 성장, 교배 동의, 알 선물과 회수도 체험할 수 있어요.</p><p>user1~user4는 플레이 계정 이름이에요. 각 계정은 아래 친구와 함께 시작해요.</p><ul>" +
+            starterPets.map((p) => "<li><strong>" + p.owner + "</strong>: " + p.species + " " + p.name + "</li>").join("") +
+            "</ul><p>이 친구들은 각 계정의 첫 뉴로링이에요. 만남으로 태어난 알이나 선물 받은 알을 더 키울 수 있어요. 한 계정이 여러 뉴로링을 키울 수 있고, 계정 이름과 펫 이름은 서로 달라요.</p><p>혼자 플레이하는 게임이에요. 위쪽 메뉴에서 이 기기의 플레이 계정을 바꿀 수 있어요. 다른 유저와 연결되지는 않아요. 만남과 선물도 같은 브라우저에서만 체험하고, 실제 지갑 연결이나 블록체인 거래는 발생하지 않아요. 진행 상황은 각자의 브라우저에만 저장되며 다른 기기로 자동 동기화되지 않아요.</p>" +
             button("close", "닫기", "primary wide"),
         );
         break;
@@ -2181,7 +2191,7 @@
         addLog(r.ownerB + "가 작은 만남에 동의했어요.");
         save();
         render();
-        toast(r.ownerB + "의 지갑 역할로 동의 체험을 마쳤어요.");
+        toast(r.ownerB + " 계정으로 동의 체험을 마쳤어요.");
         break;
       }
       case "cancel-request":
