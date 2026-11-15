@@ -2047,7 +2047,7 @@
     if (pr.events.length > 60) pr.events = pr.events.slice(-60);
     return e;
   }
-  // 저장된 기록을 처음부터 다시 해시해 사슬이 이어지는지 확인한다
+  // 보관된 최근 60개 기록의 내부 일관성만 확인한다. 외부 기준값·현재 상태는 대조하지 않는다.
   function proofVerify(p) {
     const ev = proofOf(p).events;
     for (let i = 0; i < ev.length; i++) {
@@ -2062,16 +2062,17 @@
     const ev = proofOf(p).events;
     const head = ev.length ? ev[ev.length - 1].hash : PROOF_ZERO;
     return (
-      '<div class="temper-title"><span>경험 지문</span><small>SHA-256 해시 체인 · 온체인 기록 아님</small></div>' +
+      '<div class="temper-title"><span>경험 지문</span><small>최근 60개 · 로컬 해시 사슬</small></div>' +
       (ev.length
         ? '<ol class="proof-list">' + ev.slice(-4).reverse().map((e) => '<li><span class="pf-seq">#' + e.seq + '</span><span class="pf-type">' + (PROOF_LABEL[e.type] || e.type) + '</span><code title="' + e.hash + '">' + e.hash.slice(0, 10) + "…</code></li>").join("") + "</ol>" +
           '<div class="proof-foot"><code title="' + head + '">최신 ' + head.slice(0, 16) + "…</code>" + button("lab-verify", icon("check") + " 다시 계산해 검증", "small") + "</div>"
-        : '<p class="lab-empty">실험을 하면 기록마다 지문이 생겨요. 각 지문은 이전 지문을 포함해서, 기록 하나만 고쳐도 뒤의 사슬이 모두 어긋나요.</p>')
+        : '<p class="lab-empty">실험 기록을 이전 지문과 이어서 최근 60개까지 보관해요. 다시 계산하면 저장된 내용과 연결이 맞는지 확인할 수 있어요.</p>') +
+      '<p class="brain-note">이 브라우저에 남은 기록끼리 비교해요. 기록 삭제나 내용과 지문을 함께 바꾼 경우는 알아내지 못해요. 현재 기억과의 대조·온체인 검증은 준비 중이에요.</p>'
     );
   }
   function labVerify() {
     const p = selected(), r = proofVerify(p);
-    if (r.ok) toast("경험 지문 " + r.n + "개를 다시 계산했어요. 모두 일치해요.");
+    if (r.ok) toast("보관된 경험 지문 " + r.n + "개의 내용과 연결이 일치해요.");
     else toast("#" + r.at + " 기록의 " + r.why + "이 맞지 않아요. 기록이 바뀌었을 수 있어요.");
   }
 
@@ -2687,7 +2688,7 @@
       steps +
       '<p class="dialog-caption" style="color:var(--muted);margin-top:17px">화면 체험용 동의입니다. 실제 지갑 서명이나 거래는 발생하지 않아요.</p></section><aside class="panel info-panel">' +
       icon("branch") +
-      '<h2>유전 방식</h2><p>골격은 부모 한쪽에서 통째로, 귀·외피·꼬리·발·무늬·눈은 같은 기관끼리 부모 중 한쪽에서 물려받아요.</p><img src="assets/hybrid.png" alt="토끼와 거북의 특성을 이어받은 아이의 예시" loading="lazy">' +
+      '<h2>외형 유전 설계</h2><p>골격과 귀·외피·꼬리·발·무늬·눈은 기관별로 부모 중 한쪽에서 물려받도록 설계했어요. 현재 화면 체험에서는 첫 번째 부모의 기본형 이미지를 사용해요. 부위를 조합한 외형은 준비 중이에요.</p><img src="assets/hybrid.png" alt="토끼와 거북의 특성을 이어받은 외형 합성 구상 예시" loading="lazy">' +
       button(
         "gallery",
         "유전 이야기 자세히 보기 " + icon("arrow"),
@@ -2916,12 +2917,12 @@
   function gallery(which) {
     const items = {
       parts: [
-        "기관 파츠",
-        "귀·외피·꼬리·발·무늬·눈. 같은 기관끼리 부모의 특성을 이어받아요.",
+        "기관 파츠 설계",
+        "귀·외피·꼬리·발·무늬·눈을 기관별로 물려받는 구상이에요. 아래 이미지는 설계 참고용이며, 현재 화면에서 부위를 합성하지는 않아요.",
       ],
       hybrid: [
-        "교배 예시",
-        "거북의 외피도 토끼 골격에 맞는 등판으로 변형되어 자연스럽게 어울려요.",
+        "외형 합성 구상",
+        "거북의 외피를 토끼 골격에 맞는 등판으로 표현하는 설계 예시예요. 실제 부위 합성은 준비 중이에요.",
       ],
       hatching: [
         "부화 과정",
@@ -2933,7 +2934,7 @@
       ],
       "rabbit-parts": [
         "골격과 부착점",
-        "기본 골격에 귀·꼬리·무늬·발·눈이 정해진 위치에 붙어요.",
+        "기본 골격의 정해진 위치에 기관 파츠를 붙이는 설계예요. 현재는 기본형과 성장 단계별 완성 이미지를 사용해요.",
       ],
       evolution: [
         "진화 갈래",
@@ -3396,7 +3397,7 @@
       case "about":
         openDialog(
           "체험 모드 안내",
-          "<p>HatchMind 게임 화면 체험이에요. 정원에서 쓰다듬기·먹이·놀이·부르기·산책·재우기로 뉴로링과 상호작용하면, 그 입력이 커넥톰 회로를 학습시켜 반응과 기질이 바뀌어요. 성장, 교배 동의, 알 선물과 회수도 체험할 수 있어요.</p><p>user1~user4는 플레이 계정 이름이에요. 각 계정은 아래 친구와 함께 시작해요.</p><ul>" +
+          "<p>HatchMind 게임 화면 체험이에요. 정원에서 돌보거나 향기 실험을 하면, 연구를 참고한 추상 회로가 학습해 반응과 기질이 바뀌어요. 성장, 교배 동의, 알 선물과 회수도 체험할 수 있어요.</p><p>user1~user4는 플레이 계정 이름이에요. 바로 돌봄을 체험할 수 있도록 각 계정은 아래 친구의 성장기 모습으로 시작해요.</p><ul>" +
             starterPets.map((p) => "<li><strong>" + p.owner + "</strong>: " + p.species + " " + p.name + "</li>").join("") +
             "</ul><p>이 친구들은 각 계정의 첫 뉴로링이에요. 만남으로 태어난 알이나 선물 받은 알을 더 키울 수 있어요. 한 계정이 여러 뉴로링을 키울 수 있고, 계정 이름과 펫 이름은 서로 달라요.</p><p>혼자 플레이하는 게임이에요. 위쪽 메뉴에서 이 기기의 플레이 계정을 바꿀 수 있어요. 다른 유저와 연결되지는 않아요. 만남과 선물도 같은 브라우저에서만 체험하고, 실제 지갑 연결이나 블록체인 거래는 발생하지 않아요. 진행 상황은 각자의 브라우저에만 저장되며 다른 기기로 자동 동기화되지 않아요.</p>" +
             button("close", "닫기", "primary wide"),
