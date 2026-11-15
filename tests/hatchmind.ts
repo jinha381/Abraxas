@@ -489,5 +489,29 @@ describe("HatchMind local on-chain integration", function () {
       assert.equal(await ownerOf(asset.publicKey), alice.publicKey.toBase58());
       assert.isTrue((await program.account.breedingRequest.fetch(r.address)).consumed);
     });
+    it("R01 RISK: 공개 seed로 nonce를 골라 목표 genome의 자식을 실제 발행", async () => {
+      const { findNonce } = require("../scripts/nonce-grind.cjs");
+      const pa = await program.account.petRecord.fetch(pet(a.publicKey));
+      const pb = await program.account.petRecord.fetch(pet(b.publicKey));
+      const target = pa.genome.map((value: number, i: number) => i % 2 ? pb.genome[i] : value);
+      const result = findNonce({ assetA: a.publicKey.toBase58(), assetB: b.publicKey.toBase58(), genomeA: pa.genome, genomeB: pb.genome, target, startNonce: 1000000n });
+      await ready(a, b);
+      const nonce = Number(result.nonce), r = { a, b, nonce, address: breed(a.publicKey, b.publicKey, nonce) };
+      await duplicate(r); await approve(r, bob);
+      const child = Keypair.generate(); await execution(r, child, alice, alice.publicKey).rpc();
+      const record = await program.account.petRecord.fetch(pet(child.publicKey));
+      assert.deepEqual(record.genome, target, "고른 nonce가 실제 온체인 유전을 조절합니다");
+      assert.equal(Buffer.from(record.seed).toString("hex"), result.seed);
+      const loci = pa.genome.filter((v: number, i: number) => v !== pb.genome[i]).length;
+      note("R01", { verdict: "RISK 재현", ...result, differing_loci: loci, possible_genomes: 2 ** loci, target });
+    });
+    it("R02 RISK: 비밀값을 아는 제3자가 먼저 선물을 청구해 소유권 획득", async () => {
+      const { asset } = await mintChild(), g = await makeGift(asset, alice);
+      await claim(g, relay);
+      assert.equal(await ownerOf(asset.publicKey), relay.publicKey.toBase58());
+      assert.isTrue((await program.account.giftClaim.fetch(g.address)).claimed);
+      await unchanged([g.address, asset.publicKey], () => claim(g, bob), "AlreadyClaimed");
+      note("R02", { verdict: "RISK 재현", recipient_bound: false, third_party_claimed: true });
+    });
   });
 });
