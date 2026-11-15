@@ -177,6 +177,7 @@
     note: "....#######.|....#######.|....#.....#.|....#.....#.|....#.....#.|....#.....#.|..###...###.|.####..####.|.####..####.|..##....##..|............|............",
     paw: "...##..##...|...##..##...|.##......##.|.##......##.|.....##.....|...######...|..########..|..########..|...######...|............|............|............",
     zz: ".######.....|.....##.....|....##......|...##.......|..##........|.######.####|.........##.|........##..|.......##...|......####..|............|............",
+    flower: ".....##.....|...#.##.#...|..###..###..|..##.##.##..|....####....|..##.##.##..|..###..###..|...#.##.#...|.....##.....|.....##.....|...#.##.....|....###.....",
     neuron: ".#........#.|..#......#..|...#....#...|....####....|...######...|#.########.#|...######...|....####....|...#....#...|..#......#..|.#........#.|............",
     bang: ".....##.....|.....##.....|.....##.....|.....##.....|.....##.....|.....##.....|............|.....##.....|.....##.....|............|............|............",
     ask: "...#####....|..##...##...|.......##...|......##....|.....##.....|.....##.....|............|.....##.....|.....##.....|............|............|............",
@@ -230,6 +231,7 @@
       filter: "all",
       request: null,
       gifts: [],
+      friends: [],
       pets: starterPets.map(({ name, owner }, type) => ({
         id: "founder-" + type,
         name,
@@ -278,6 +280,7 @@
           p.stats,
       );
     state = valid ? saved : freshState();
+    if (!Array.isArray(state.friends)) state.friends = [];
   } catch {
     state = freshState();
   }
@@ -434,6 +437,7 @@
   const VERBS = [
     { a: "pat", icon: "hand", title: "쓰다듬기", sense: 0, c: "#d5afbf" },
     { a: "feed", icon: "carrot", title: "먹이 주기", sense: 1, c: "#d9b48f" },
+    { a: "scent", icon: "flower", title: "향기 실험", sense: 4, c: "#d6a6c9" },
     { a: "play", icon: "star", title: "함께 놀기", sense: 2, c: "#8eb2b4" },
     { a: "call", icon: "note", title: "이름 부르기", sense: 3, c: "#a99ccb" },
     { a: "walk", icon: "paw", title: "산책 가기", sense: 4, c: "#a7bba5" },
@@ -671,6 +675,133 @@
       trait: ["해 보니까 알겠네. 내 방식이 생겼어.", "조금 달라졌어. 나쁘지 않은데."],
     },
   ];
+  // 광장·향기 실험 대사. 보상 기억과 가상 상태 비교를 실제 돌봄 상태와 구별한다.
+  const SCENE_VOICES = [
+    {
+      plazaArrive: ["발자국이 잔뜩이야! 누가 왔나 볼까?", "여긴 길이 모이는 곳이구나! 귀가 바빠!"],
+      meetNew: ["안녕, {name}! 넌 어느 길로 왔어?", "{name}, 반가워! 같이 풀 냄새 맡아 볼래?"],
+      meetFriend: ["{name}! 오늘은 뭐 재밌는 거 찾았어?", "또 만났네, {name}! 이번엔 어디 가 볼까?"],
+      friendMade: ["{name}, 이제 친구네! 내 샛길도 알려 줄게!", "친구가 됐어! {name}, 다음에도 같이 걷자!"],
+      plazaReturn: ["다녀왔어! 광장으로 가는 길을 외웠어!", "바깥 구경 끝! 이번엔 정원에서 뭘 찾을까?"],
+      labEnter: ["딸기랑 민트? 냄새도 탐험할 수 있겠네!", "킁킁! 두 향기가 어디서 달라지는 걸까?"],
+      labEnterHungry: ["배가 꼬르륵! 냄새 따라가면 뭐가 있을까?", "킁킁… 배고프니까 향기가 더 궁금해!"],
+      labEnterFull: ["배는 동그래도 코는 궁금해! 향기부터 볼까?", "배부르니까 이번엔 냄새에만 집중해 볼래!"],
+      labEnterTired: ["발은 피곤해도 킁킁은 할 수 있어. 천천히!", "여기선 뛰지 말고 향기만 살펴볼까?"],
+      labPreferA: ["이번엔 {odor} 쪽이 더 궁금했어!", "킁킁! 이번엔 {odor} 쪽에 자꾸 갔네!"],
+      labPreferB: ["이번엔 민트 쪽을 더 둘러봤어!", "민트 쪽이 더 궁금했어. 뭐가 다를까?"],
+      labTie: ["두 냄새 다 궁금해서 왔다 갔다 했어!", "이번엔 둘이 비슷했네. 더 알아보고 싶어!"],
+      labRecall: ["딸기 향! 당근 받던 때가 떠올랐어!", "이 냄새랑 당근, 같이 만났었지!"],
+      labHungryA: ["배고프다 생각하니까 딸기 쪽이 더 궁금해!", "꼬르륵할 때를 떠올리니 딸기 쪽으로 갔네!"],
+      labHungryB: ["배고프다 생각해도 이번엔 민트 쪽이었어!", "꼬르륵할 때를 떠올렸는데 민트가 궁금했네!"],
+      labHungryTie: ["배고픈 때를 떠올려도 두 향기가 비슷했어!", "꼬르륵할 때라 생각해도 양쪽 다 궁금하네!"],
+      labFullA: ["배부르다 생각해도 이번엔 딸기 쪽이었어!", "배 빵빵한 때를 떠올려도 딸기가 궁금했네!"],
+      labFullB: ["배부르다 생각하니 이번엔 민트 쪽이었어!", "배 빵빵한 때라 생각하고 민트를 더 봤네!"],
+      labFullTie: ["배부른 때를 떠올리니 두 쪽이 비슷했어!", "배 빵빵할 땐 어떨까 했는데 둘 다 궁금해!"],
+      labTransfer: ["산딸기 향! 당근 받던 딸기 향이랑 닮았네!", "조금 다르지만… 아는 딸기 향이 떠올라!"],
+      labPairFirst: ["딸기 향 맡으니까 당근이 왔네! 아삭!", "킁킁, 딸기! 아삭, 당근! 같이 만났어!"],
+      labPairAgain: ["또 딸기 향이랑 당근! 짝을 찾은 것 같아!", "킁킁 다음 아삭! 이 순서, 또 만났네!"],
+      labPairHungry: ["배고팠어! 딸기 향 맡으며 아삭아삭!", "꼬르륵했는데 당근이다! 딸기 향도 나네!"],
+      labPairFull: ["배는 찼지만 이 한 입이랑 향기를 살펴볼게!", "아삭… 배불러서 딸기 향도 천천히 볼래!"],
+      labNoRewardKnown: ["딸기 향만 있네? 이번엔 당근이 안 왔어.", "킁킁 다음 아삭인 줄 알았는데… 이번엔 없네!"],
+      labNoRewardNew: ["딸기 향만 맡는 거구나. 뭐가 다를까?", "킁킁! 이번엔 먹이 없이 향기만 살펴봤어!"],
+      labMint: ["민트는 시원한 느낌이야! 이번엔 냄새만!", "킁킁, 민트! 먹이 없이도 궁금한 냄새네!"],
+      labReturn: ["향기 탐험 끝! 정원 냄새랑도 비교해 볼까?", "다녀왔어! 코로도 새로운 걸 찾을 수 있네!"],
+      labReturnLearned: ["딸기 향이랑 당근을 만나고 왔어!", "킁킁이랑 아삭이 같이 있었지! 잊지 말자!"],
+    },
+    {
+      plazaArrive: ["여러 길이 만나는 곳이네요. 천천히 둘러볼게요.", "먼저 익숙한 발소리가 있는지 들어 볼게요."],
+      meetNew: ["안녕하세요, {name}. 천천히 가까이 가도 될까요?", "{name}, 반가워요. 여기서 인사할게요."],
+      meetFriend: ["{name}, 다시 만나서 마음이 놓여요.", "익숙한 발소리네요. {name}, 잘 지냈나요?"],
+      friendMade: ["{name}, 친구가 됐네요. 제 속도로 다가갈게요.", "기다려 줘서 고마워요, {name}. 친구로 지내요."],
+      plazaReturn: ["광장에서 잘 돌아왔어요. 여기서 조금 쉴게요.", "바깥 길을 천천히 익혔어요. 정원은 편안하네요."],
+      labEnter: ["두 향기를 하나씩 천천히 맡아 볼게요.", "먼저 딸기 향과 민트 향을 구별해 볼까요?"],
+      labEnterHungry: ["배가 고프네요. 향기를 천천히 살펴볼게요.", "속이 비었지만 서두르지 않고 맡아 볼게요."],
+      labEnterFull: ["지금은 배가 불러요. 향기부터 살펴볼게요.", "먹이는 충분했으니 냄새에 집중해 볼까요?"],
+      labEnterTired: ["조금 피곤하네요. 여기서 천천히 맡을게요.", "많이 움직이기보다 향기를 차분히 살펴볼게요."],
+      labPreferA: ["이번에는 {odor} 쪽으로 더 자주 갔네요.", "조금씩 맡아 보니 이번엔 {odor} 쪽이네요."],
+      labPreferB: ["이번에는 민트 쪽으로 더 자주 갔어요.", "지금 고른 쪽은 민트네요. 천천히 맡았어요."],
+      labTie: ["이번엔 두 향기 사이에 큰 차이가 없었어요.", "어느 쪽이라고 정하기엔 비슷하게 골랐네요."],
+      labRecall: ["딸기 향을 맡으니 당근을 받던 때가 떠올라요.", "이 향기와 먹이를 함께 만났던 기억이 나네요."],
+      labHungryA: ["배고픈 때를 떠올리니 딸기 쪽을 더 골랐네요.", "허기진 때라고 생각하니 딸기 쪽으로 갔어요."],
+      labHungryB: ["배고픈 때로 생각해도 이번엔 민트를 더 골랐어요.", "허기진 때를 떠올렸지만 이번엔 민트 쪽이네요."],
+      labHungryTie: ["배고픈 때를 떠올려도 두 쪽이 비슷했어요.", "허기진 때라고 생각해도 큰 차이는 없네요."],
+      labFullA: ["배부른 때를 떠올려도 딸기를 더 골랐어요.", "든든한 때라고 생각해도 이번엔 딸기 쪽이네요."],
+      labFullB: ["배부른 때를 떠올리니 민트를 더 골랐네요.", "든든한 때라고 생각하니 이번엔 민트 쪽이에요."],
+      labFullTie: ["배부른 때라고 생각하니 두 향기가 비슷했어요.", "든든한 때를 떠올려도 한쪽으로 기울진 않네요."],
+      labTransfer: ["산딸기 향에 익숙한 딸기 향이 조금 느껴져요.", "다른 향기지만 먹이를 받던 딸기 향과 닮았네요."],
+      labPairFirst: ["딸기 향을 맡는 동안 당근을 받았네요.", "이 향기와 한 입을 함께 천천히 느껴 볼게요."],
+      labPairAgain: ["이번에도 딸기 향과 당근이 함께 왔네요.", "이 순서를 다시 겪으니 조금 익숙해져요."],
+      labPairHungry: ["배가 고팠어요. 딸기 향을 맡으며 꼭꼭 씹을게요.", "이 한 입이 든든하네요. 딸기 향도 함께 나요."],
+      labPairFull: ["배가 불러서요. 한 입과 향기를 천천히 느낄게요.", "지금은 든든해요. 작은 한 입부터 씹을게요."],
+      labNoRewardKnown: ["딸기 향은 같은데 이번엔 먹이가 오지 않네요.", "당근을 받던 향기지만 지금은 냄새만 있네요."],
+      labNoRewardNew: ["딸기 향만 맡는 시간이군요. 천천히 볼게요.", "먹이 없이 향기만 살펴봤어요."],
+      labMint: ["이번엔 먹이 없이 민트 향만 살펴봤어요.", "민트 향이네요. 조용히 조금 더 맡아 볼게요."],
+      labReturn: ["향기를 천천히 살펴보고 돌아왔어요.", "정원에 돌아왔네요. 맡았던 향기를 정리해 볼게요."],
+      labReturnLearned: ["딸기 향과 당근을 함께 만난 게 떠오르네요.", "서두르지 않고 향기와 먹이의 짝을 익혔어요."],
+    },
+    {
+      plazaArrive: ["다들 산책 왔구나! 옆에 가서 인사하고 싶어!", "발소리가 여럿이야! 같이 쉬어 갈 수 있을까?"],
+      meetNew: ["안녕, {name}! 잠깐 같이 있어도 돼?", "{name}, 반가워! 오늘 산책은 어땠어?"],
+      meetFriend: ["{name}! 또 만나서 정말 좋아!", "왔구나, {name}! 네 옆자리로 가도 되지?"],
+      friendMade: ["{name}, 우리 친구네! 다음에도 반갑게 만나자!", "친구가 돼서 좋아! {name}, 같이 걸을래?"],
+      plazaReturn: ["광장 다녀왔어! 이제 여기서 같이 쉬자!", "다시 정원이네! 산책 얘기 같이 나눌래?"],
+      labEnter: ["두 향기 같이 맡아 볼래? 네가 옆에 있으면 좋아!", "킁킁! 어느 냄새가 좋은지 같이 알아보자!"],
+      labEnterHungry: ["꼬르륵… 향기 맡는 동안 옆에 있어 줄래?", "배가 고프니까 먹이 생각도 같이 나네."],
+      labEnterFull: ["배는 든든해! 이번엔 같이 향기 구경하자!", "배부른 지금은 냄새를 천천히 즐겨 볼래."],
+      labEnterTired: ["조금 피곤해. 네 옆에서 천천히 맡아 볼래.", "뛰진 말고 같이 향기만 구경하자."],
+      labPreferA: ["이번엔 {odor} 쪽에 더 자주 갔어!", "지금은 {odor} 쪽이 더 끌렸어. 너도 맡아 봐!"],
+      labPreferB: ["이번엔 민트 쪽이 더 끌렸어! 같이 맡아 볼래?", "민트 쪽을 더 많이 골랐네. 넌 어땠어?"],
+      labTie: ["둘 다 비슷하게 골랐네! 같이 맡으니 재밌다.", "한쪽만 고르긴 어렵네. 둘 다 궁금했어!"],
+      labRecall: ["딸기 향! 네가 당근을 주던 때가 떠올라!", "이 냄새랑 당근, 우리 같이 만났었지!"],
+      labHungryA: ["배고픈 때를 떠올리니 딸기 쪽이 더 끌렸어!", "꼬르륵한 때라고 생각하니 딸기를 더 골랐네!"],
+      labHungryB: ["배고픈 때라 생각해도 이번엔 민트가 끌렸어!", "허기질 때를 떠올렸는데도 민트를 더 골랐네!"],
+      labHungryTie: ["배고픈 때를 떠올려도 둘 다 비슷했어!", "꼬르륵한 때라고 생각했는데 양쪽 다 끌리네!"],
+      labFullA: ["배부르다 생각해도 이번엔 딸기를 더 골랐어!", "든든한 때를 떠올려도 딸기 쪽이 끌렸네!"],
+      labFullB: ["배부르다 생각하니 이번엔 민트를 더 골랐네!", "든든한 때라고 생각하니까 민트 쪽이었어!"],
+      labFullTie: ["배부른 때를 떠올리니 두 향기가 비슷했어!", "든든한 때라고 생각해도 둘 다 궁금하네!"],
+      labTransfer: ["산딸기 향에도 당근 받던 딸기 향이 느껴져!", "조금 다른데 익숙해! 딸기 향이랑 닮았네!"],
+      labPairFirst: ["딸기 향 맡으며 당근도 받았어! 고마워!", "향기랑 당근이 같이 왔네! 네 옆에서 먹을래."],
+      labPairAgain: ["또 딸기 향이랑 당근이네! 같이 기억하자!", "이 냄새 다음에 또 당근! 챙겨 줘서 고마워!"],
+      labPairHungry: ["배고픈 걸 알아줬구나! 딸기 향도 같이 나네!", "우물우물! 딸기 향 맡으며 네 옆에서 먹을래."],
+      labPairFull: ["배는 든든해! 이 한 입은 천천히 먹을게.", "배가 빵빵하네. 네 옆에서 향기도 살살 맡을래."],
+      labNoRewardKnown: ["당근 받던 딸기 향인데 이번엔 향기만 있네?", "그때랑 같은 냄새야. 오늘은 먹이가 안 오네."],
+      labNoRewardNew: ["이번엔 딸기 향만 맡는 거구나! 같이 맡자.", "당근 없이 냄새만 봤어. 네 옆이니 괜찮아!"],
+      labMint: ["민트 향만 같이 맡아 보자! 이번엔 먹이 없이.", "킁킁, 민트네! 너도 이 냄새 느껴져?"],
+      labReturn: ["같이 향기 구경하고 왔네! 여기서 쉬자.", "다녀왔어! 너랑 냄새 알아보는 것도 재밌다!"],
+      labReturnLearned: ["딸기 향이 나면 네가 준 당근도 떠오를 것 같아!", "향기랑 당근을 같이 만났네! 옆에 있어 줘서 좋아."],
+    },
+    {
+      plazaArrive: ["길이 모이는 곳이네. 일단 그늘에서 볼게.", "발소리가 많네. 조금 떨어져서 둘러볼까."],
+      meetNew: ["안녕, {name}. 그쪽 길은 어땠어?", "{name}, 반가워. 조금 떨어져 있어도 들려."],
+      meetFriend: ["{name}, 또 왔네. 같이 잠깐 걸을까.", "네 발소리는 알겠어, {name}. 잘 지냈어?"],
+      friendMade: ["{name}, 친구가 됐네. 가끔 같이 걷자.", "친구라… 괜찮네. {name}, 다음에도 보자."],
+      plazaReturn: ["광장은 보고 왔어. 이제 내 자리에서 쉴게.", "다녀왔어. 정원의 조용함도 괜찮네."],
+      labEnter: ["냄새가 둘이네. 하나씩 따로 맡아 볼게.", "딸기랑 민트라. 내 쪽에서 구별해 볼게."],
+      labEnterHungry: ["배가 비었네. 냄새에 더 신경 쓰일지도.", "먹이 생각이 나긴 해. 일단 향기부터 볼게."],
+      labEnterFull: ["배는 찼어. 냄새만 천천히 살펴볼게.", "지금 먹을 생각은 별로 없어. 향기는 볼 만하네."],
+      labEnterTired: ["좀 피곤해. 여기서 냄새만 조용히 볼게.", "멀리 움직이진 말자. 코로 구별해 볼게."],
+      labPreferA: ["이번엔 {odor} 쪽을 더 골랐어.", "발이 더 자주 간 쪽은 {odor} 쪽이었네."],
+      labPreferB: ["이번엔 민트 쪽이었어. 그쪽이 더 끌렸네.", "민트를 더 자주 골랐어. 지금은 그래."],
+      labTie: ["이번엔 비슷했어. 한쪽만 고를 정돈 아니네.", "양쪽을 오갔어. 아직은 딱히 한쪽이 없어."],
+      labRecall: ["딸기 향. 당근 받던 때가 생각나네.", "이 냄새랑 먹이를 같이 만났었지. 기억나."],
+      labHungryA: ["배고픈 때라 생각하니 딸기를 더 골랐네.", "허기진 때를 떠올리면 이번엔 딸기 쪽이야."],
+      labHungryB: ["배고픈 때로 생각해도 이번엔 민트였어.", "허기진 때를 떠올려도 민트를 더 골랐네."],
+      labHungryTie: ["배고픈 때라 생각해도 양쪽이 비슷했어.", "허기진 때를 떠올렸는데도 딱히 한쪽은 없네."],
+      labFullA: ["배부른 때라 생각해도 딸기를 더 골랐어.", "든든한 때를 떠올려도 이번엔 딸기 쪽이네."],
+      labFullB: ["배부른 때를 떠올리니 이번엔 민트 쪽이야.", "든든한 때라 생각하고 민트를 더 골랐어."],
+      labFullTie: ["배부른 때라 생각하니 양쪽이 비슷했네.", "든든한 때를 떠올려도 한쪽으론 안 기울었어."],
+      labTransfer: ["산딸기 향. 당근 받던 딸기 향이랑 닮았어.", "조금 다르지만 아는 냄새가 섞였네. 딸기인가."],
+      labPairFirst: ["딸기 향이랑 당근이 같이 왔네. 잘 먹을게.", "향기 다음 한 입. 일단 같이 겪어 보는 거군."],
+      labPairAgain: ["이번에도 딸기 향 다음에 당근이네.", "같은 짝이 또 왔어. 조금 알 것 같네."],
+      labPairHungry: ["딱 필요했어. 딸기 향 맡으며 먹을게.", "배고팠거든. 이 한 입과 냄새는 알아 두지."],
+      labPairFull: ["배는 찼어. 한 입만 천천히 씹을게.", "지금은 든든해. 냄새랑 조금씩 느껴 볼게."],
+      labNoRewardKnown: ["딸기 향은 같은데 이번엔 당근이 없네.", "먹이 받던 냄새야. 지금은 향기만 있군."],
+      labNoRewardNew: ["딸기 향만 있네. 먹이는 없는 거군.", "이번엔 냄새만 살펴봤어. 일단 알아둘게."],
+      labMint: ["민트 향이네. 이번엔 먹이 없이 맡는 거군.", "민트는 따로 살펴볼게. 냄새만 조용히."],
+      labReturn: ["향기는 보고 왔어. 이제 조용히 쉴게.", "다녀왔어. 정원 냄새도 다시 맡아볼 만하네."],
+      labReturnLearned: ["딸기 향이랑 당근. 같이 만난 건 기억해.", "익힌 냄새가 하나 생겼네. 나중에도 알아볼까."],
+    },
+  ];
   const lastLines = new Map();
   function pickLine(p, context, lines) {
     const key = p.id + ":" + context, previous = lastLines.get(key);
@@ -680,7 +811,33 @@
     return line;
   }
   function momentLine(p, context) {
-    return pickLine(p, context, VOICES[p.type][context]);
+    return pickLine(p, context, VOICES[p.type][context] || SCENE_VOICES[p.type][context]);
+  }
+  function sceneLine(p, context, other) {
+    return momentLine(p, context).replace(/\{name\}/g, () => other ? other.name : "친구");
+  }
+  function arrivalLine(p, context) {
+    if (p.stats.food < 35) return momentLine(p, context === "labEnter" ? "labEnterHungry" : "hungry");
+    if (p.stats.energy < 30) return momentLine(p, context === "labEnter" ? "labEnterTired" : "tired");
+    if (context === "labEnter" && p.stats.food >= 90) return momentLine(p, "labEnterFull");
+    return momentLine(p, context);
+  }
+  function labResultLine(p, kind, hits, x, base) {
+    const o = odorOf(p), preference = hits >= 7 ? "A" : hits <= 3 ? "B" : "Tie";
+    let context = "lab" + (preference === "Tie" ? "Tie" : "Prefer" + preference);
+    if (kind === "hungry" || kind === "full") {
+      context = "lab" + (kind === "hungry" ? "Hungry" : "Full") + preference;
+    } else if (kind === "transfer" && o.pairs > 0 && hits >= 6) {
+      context = "labTransfer";
+    } else if (kind === "retest" && o.pairs > 0 && base && hits / 10 - base.rate >= 0.2) {
+      context = "labRecall";
+    }
+    return momentLine(p, context).replace(/\{odor\}/g, () => ODORS[x].name);
+  }
+  function labPairLine(p, foodBefore) {
+    const context = foodBefore < 35 ? "labPairHungry" : foodBefore >= 90 ? "labPairFull"
+      : odorOf(p).pairs === 1 ? "labPairFirst" : "labPairAgain";
+    return momentLine(p, context);
   }
   function idleLine(p) {
     if (p.stats.food < 35) return momentLine(p, "hungry");
@@ -1163,6 +1320,20 @@
     await wait(900);
     if (gen === stg.gen) setFrame();
   }
+  async function walkOut(gen, line) {
+    const p = selected(), stage = $("#stage");
+    if (!stage) return;
+    await moveTo(46, gen);
+    if (gen !== stg.gen) return;
+    face(1);
+    say(line, 2000);
+    body("hop");
+    stage.classList.add("strolling");
+    await wait(reduce() ? 200 : 1900);
+    if (gen !== stg.gen) return;
+    stage.classList.remove("strolling");
+    navigate("plaza");
+  }
   async function idleLoop(gen) {
     while (gen === stg.gen) {
       await wait(7000 + Math.random() * 7000);
@@ -1216,6 +1387,12 @@
     ["", "-blink", "-happy"].forEach((s) => { if (PX[n] && (s === "" || PX[n].blink)) new Image().src = "assets/px/" + n + s + ".png"; });
     const key = state.wallet + ":" + p.id;
     stg.busy = false;
+    if (stg.back) {
+      const context = stg.back === "labReturn" && p.odor && p.odor.pairs > 0 ? "labReturnLearned" : stg.back;
+      stg.back = false;
+      stg.greeted.add(key);
+      setTimeout(() => gen === stg.gen && say(arrivalLine(p, context), 3000), 400);
+    }
     if (!stg.greeted.has(key)) {
       stg.greeted.add(key);
       stg.busy = true;
@@ -1228,7 +1405,7 @@
   /* 상호작용 → 회로 → 반응 */
   async function react(verb, k, gen, line) {
     if (verb === "walk") {
-      await stroll(gen, true, line);
+      await walkOut(gen, line);
       return;
     }
     if (k === 2) {
@@ -1289,6 +1466,11 @@
   }
   async function interact(verb) {
     const p = selected();
+    if (verb === "scent") {
+      if (p.owner !== state.wallet) return toast("다른 계정의 뉴로링이에요. 내 뉴로링을 골라 주세요.");
+      if (p.stage === 0) return toast("알이 부화하면 향기 실험을 할 수 있어요.");
+      return navigate("lab");
+    }
     if (route !== "home") navigate("home");
     if (p.owner !== state.wallet) return toast("다른 계정의 뉴로링이에요. 내 뉴로링을 골라 주세요.");
     if (p.stage === 0 && verb !== "pat") return toast("알이 부화하면 함께 할 수 있어요.");
@@ -1367,11 +1549,547 @@
       announceTraits(p, fresh);
     }
   }
+  /* =========================================================
+     산책로 광장: 산책을 가면 장소가 바뀌고 user1~user4의 뉴로링을 한꺼번에 만난다.
+     친구 관계는 '친구 맺기'를 눌렀을 때만 생긴다(계정 대 계정, 양방향).
+     ========================================================= */
+  const friendKey = (a, b) => [a, b].sort().join("|");
+  function isFriend(a, b) {
+    return a === b || (state.friends || []).includes(friendKey(a, b));
+  }
+  function friendsOf(w) {
+    return wallets.filter((u) => u !== w && isFriend(w, u));
+  }
+  function plazaGuest(w) {
+    const list = state.pets.filter((q) => q.owner === w && q.stage >= 1);
+    return list.sort((a, b) => b.stage - a.stage || (b.changedAt || 0) - (a.changedAt || 0))[0] || null;
+  }
+  function plazaGuests() {
+    return wallets.filter((w) => w !== state.wallet).map((w) => ({ w, p: plazaGuest(w) }));
+  }
+  function guestCard({ w, p }) {
+    const friend = isFriend(state.wallet, w);
+    if (!p)
+      return '<article class="panel guest-card empty"><strong>' + w + "</strong><p>오늘은 산책을 나오지 않았어요.<br>(아직 알만 있어요)</p></article>";
+    return (
+      '<article class="panel guest-card ' + (friend ? "friend" : "") + '" data-guest="' + w + '">' +
+      '<div class="guest-head"><span class="wallet-avatar">' + w.replace("user", "") + "</span><strong>" + w + "</strong>" +
+      (friend ? '<span class="friend-badge">' + icon("heart") + " 친구</span>" : '<span class="stranger-badge">처음 만남</span>') + "</div>" +
+      '<div class="guest-sprite">' + petSprite(p) + "</div>" +
+      "<p><b>" + esc(p.name) + "</b> · " + types[p.type].name + " · " + stageNames[p.stage] + "</p>" +
+      '<div class="guest-actions">' +
+      button("plaza-greet", icon("hand") + " 인사하기", "small", 'data-pet="' + p.id + '"') +
+      (friend
+        ? button("unfriend", "친구 끊기", "small", 'data-user="' + w + '"')
+        : button("befriend", icon("heart") + " 친구 맺기", "small primary", 'data-user="' + w + '"')) +
+      "</div></article>"
+    );
+  }
+  function plaza() {
+    const me = selected(), myFriends = friendsOf(state.wallet);
+    return (
+      heading(
+        "",
+        "산책로 광장",
+        esc(state.wallet) + "의 " + esc(me.name) + "가 산책을 나왔어요. 다른 계정의 뉴로링을 만나도, 친구 맺기를 눌러야만 친구가 돼요.",
+        button("go-home", icon("home") + " 정원으로 돌아가기", "small"),
+      ) +
+      '<section class="panel stage-panel plaza-panel"><div class="stage plaza" id="stage">' +
+      '<div class="stars" id="stars"></div><div class="sky-orb">' + skyOrb() + "</div>" +
+      '<span class="cloud" style="top:52px">' + cloudSvg() + '</span><span class="cloud c2">' + cloudSvg() + "</span>" +
+      '<div class="layer far" id="layer-far"></div><div class="layer near" id="layer-near"></div><div class="mist"></div>' +
+      '<div class="ground"></div><div class="plaza-path"></div><div class="ground-deco" id="ground-deco"></div><div class="motes" id="motes"></div>' +
+      '<div class="plaza-sign">' + icon("paw") + " 산책로 광장</div>" +
+      '<span class="stage-hint">' + icon("hand") + " 다른 뉴로링을 누르면 인사해요</span>" +
+      '<span class="stage-clock">' + icon("heart") + " 내 친구 " + myFriends.length + "명</span>" +
+      "</div></section>" +
+      '<div class="section-title plaza-title"><h2>오늘 만난 뉴로링 <span>' + plazaGuests().filter((g) => g.p).length + "</span></h2><small>친구가 되면 만남(교배) 상대로 고를 수 있어요.</small></div>" +
+      '<div class="plaza-list" id="plaza-list">' + plazaGuests().map(guestCard).join("") + "</div>"
+    );
+  }
+  function refreshPlaza() {
+    const list = $("#plaza-list");
+    if (list) list.innerHTML = plazaGuests().map(guestCard).join("");
+    const clock = $(".plaza .stage-clock");
+    if (clock) clock.innerHTML = icon("heart") + " 내 친구 " + friendsOf(state.wallet).length + "명";
+    const tags = document.querySelectorAll(".plaza .owner-tag");
+    tags.forEach((t) => {
+      const w = t.dataset.owner;
+      t.classList.toggle("friend", w !== state.wallet && isFriend(state.wallet, w));
+    });
+  }
+
+  /* 광장 무대: 여러 펫을 각자 움직인다 */
+  const plz = { gen: 0, busy: false };
+  const pz = {
+    el: (id) => document.querySelector('.plaza .pet[data-id="' + id + '"]'),
+    frame(el, p, kind) {
+      const img = el && el.querySelector("img");
+      if (!img) return;
+      const n = spriteName(p), info = PX[n];
+      img.src = "assets/px/" + n + (kind && info && info.blink ? "-" + kind : "") + ".png";
+    },
+    face(el, p, dir) {
+      const info = PX[spriteName(p)], flip = el && el.querySelector(".pet-flip");
+      if (!flip || !info || !info.face) return;
+      el.dataset.dir = dir;
+      flip.classList.toggle("left", dir * info.face < 0);
+    },
+    body(el, cls) {
+      const b = el && el.querySelector(".pet-body");
+      if (b) b.className = "pet-body " + (cls || "");
+    },
+    say(el, text, ms = 2600) {
+      const sp = el && el.querySelector(".speech");
+      if (!sp) return;
+      sp.hidden = false;
+      sp.textContent = text;
+      const x = parseFloat(el.style.left) || 50;
+      sp.classList.toggle("edge-l", x < 24);
+      sp.classList.toggle("edge-r", x > 76);
+      sp.style.animation = "none";
+      void sp.offsetWidth;
+      sp.style.animation = x < 24 || x > 76 ? "none" : "";
+      clearTimeout(sp._t);
+      sp._t = setTimeout(() => (sp.hidden = true), ms);
+    },
+    fx(el, kind, n = 3) {
+      const stage = $("#stage");
+      if (!stage || !el || reduce()) return;
+      const sr = stage.getBoundingClientRect(), pr = el.getBoundingClientRect();
+      for (let i = 0; i < n; i++) {
+        const e = document.createElement("span");
+        e.className = "fx " + kind;
+        e.innerHTML = icon(kind === "note" ? "note" : kind === "spark" ? "spark" : "heart");
+        e.style.left = Math.round(pr.left - sr.left + pr.width * (0.3 + Math.random() * 0.4)) + "px";
+        e.style.top = Math.round(pr.top - sr.top + pr.height * 0.1) + "px";
+        e.style.setProperty("--dx", Math.round((Math.random() - 0.5) * 40) + "px");
+        e.style.animationDelay = i * 0.18 + "s";
+        stage.append(e);
+        setTimeout(() => e.remove(), 1600 + i * 180);
+      }
+    },
+    async move(el, p, x, gen, speed = 0.12) {
+      if (!el || gen !== plz.gen) return;
+      const from = parseFloat(el.style.left) || 50, dist = Math.abs(x - from);
+      if (dist < 1) return;
+      pz.face(el, p, x > from ? 1 : -1);
+      const ms = reduce() ? 0 : Math.round((dist / speed) * 10);
+      pz.body(el, "hop");
+      el.style.transition = "left " + ms + "ms linear";
+      el.style.left = x + "%";
+      await wait(ms + 30);
+      if (gen === plz.gen) pz.body(el, "");
+    },
+  };
+  function plazaPetEl(p, x, mine) {
+    const info = PX[spriteName(p)] || { w: 300 };
+    const wrap = document.createElement("div");
+    wrap.className = "pet" + (mine ? " mine" : " guest");
+    wrap.dataset.id = p.id;
+    wrap.style.left = x + "%";
+    if (!mine) {
+      wrap.dataset.action = "plaza-greet";
+      wrap.dataset.pet = p.id;
+      wrap.setAttribute("role", "button");
+      wrap.setAttribute("aria-label", p.owner + "의 " + p.name + "에게 인사하기");
+    }
+    wrap.innerHTML =
+      '<div class="speech" hidden></div><div class="pet-flip"><div class="pet-body" style="--w:' + info.w + '">' + petSprite(p) + "</div></div>" +
+      '<div class="pet-shadow"></div><span class="owner-tag' + (!mine && isFriend(state.wallet, p.owner) ? " friend" : "") + (mine ? " me" : "") + '" data-owner="' + p.owner + '">' +
+      (mine ? "나 · " : "") + esc(p.owner) + " · " + esc(p.name) + "</span>";
+    return wrap;
+  }
+  function mountPlaza() {
+    const stage = $("#stage");
+    if (!stage) return;
+    plz.gen++;
+    const gen = plz.gen;
+    paintScenery();
+    const me = selected();
+    const guests = plazaGuests().filter((g) => g.p);
+    const slots = [14, 32, 72, 90];
+    const meEl = plazaPetEl(me, -14, true);
+    stage.append(meEl);
+    guests.forEach((g, i) => {
+      const el = plazaPetEl(g.p, slots[i] ?? 20 + i * 20, false);
+      stage.append(el);
+      pz.face(el, g.p, i === 0 ? 1 : -1);
+    });
+    (async () => {
+      plz.busy = true;
+      await pz.move(meEl, me, 52, gen, 0.22);
+      if (gen !== plz.gen) return;
+      pz.frame(meEl, me, "happy");
+      pz.body(meEl, "jump");
+      pz.say(meEl, arrivalLine(me, "plazaArrive"), 3000);
+      await wait(900);
+      for (const [i, g] of guests.entries()) {
+        if (gen !== plz.gen) return;
+        const el = pz.el(g.p.id);
+        pz.face(el, g.p, (parseFloat(el.style.left) || 50) < 52 ? 1 : -1);
+        pz.say(el, sceneLine(g.p, isFriend(me.owner, g.p.owner) ? "meetFriend" : "meetNew", me), 3000);
+        pz.body(el, "jump");
+        await wait(1150);
+        pz.body(el, "");
+      }
+      pz.frame(meEl, me);
+      pz.body(meEl, "");
+      plz.busy = false;
+      const r = Math.random();
+      if (r < 0.5) {
+        state.food = Math.min(99, state.food + 1);
+        save();
+        await wait(1200);
+        if (gen === plz.gen) { pz.fx(meEl, "spark", 1); pz.say(meEl, momentLine(me, "found"), 2600); }
+      }
+    })();
+    plazaWander(gen);
+    plazaBlink(gen);
+  }
+  async function plazaWander(gen) {
+    while (gen === plz.gen) {
+      await wait(3500 + Math.random() * 4000);
+      if (gen !== plz.gen) return;
+      if (plz.busy || route !== "plaza" || document.hidden) continue;
+      const els = [...document.querySelectorAll(".plaza .pet.guest")];
+      if (!els.length) continue;
+      const el = els[Math.floor(Math.random() * els.length)], p = petById(el.dataset.id);
+      if (!p) continue;
+      const r = Math.random(), x = parseFloat(el.style.left) || 50;
+      if (r < 0.6) await pz.move(el, p, Math.max(8, Math.min(92, x + (Math.random() < 0.5 ? -1 : 1) * (6 + Math.random() * 12))), gen, 0.08);
+      else if (r < 0.8) { pz.body(el, "jump"); await wait(1100); pz.body(el, ""); }
+      else pz.say(el, idleLine(p), 2600);
+    }
+  }
+  async function plazaBlink(gen) {
+    while (gen === plz.gen) {
+      await wait(1800 + Math.random() * 2500);
+      if (gen !== plz.gen) return;
+      const els = [...document.querySelectorAll(".plaza .pet")];
+      const el = els[Math.floor(Math.random() * els.length)];
+      const p = el && petById(el.dataset.id), img = el && el.querySelector("img");
+      if (!p || !img || /-(happy|blink)\.png$/.test(img.src)) continue;
+      pz.frame(el, p, "blink");
+      await wait(130);
+      if (/-blink\.png$/.test(img.src)) pz.frame(el, p);
+    }
+  }
+  async function plazaGreet(id) {
+    const g = petById(id), me = selected();
+    if (!g || g.owner === state.wallet) return;
+    const gen0 = plz.gen;
+    for (let i = 0; plz.busy && i < 40; i++) await wait(150);
+    if (plz.busy || gen0 !== plz.gen) return;
+    const gen = plz.gen, meEl = pz.el(me.id), gEl = pz.el(g.id);
+    if (!meEl || !gEl) return;
+    plz.busy = true;
+    const gx = parseFloat(gEl.style.left) || 50;
+    await pz.move(meEl, me, gx < 50 ? gx + 13 : gx - 13, gen, 0.22);
+    if (gen !== plz.gen) return;
+    pz.face(meEl, me, gx < 50 ? -1 : 1);
+    pz.face(gEl, g, gx < 50 ? 1 : -1);
+    pz.frame(meEl, me, "happy");
+    pz.frame(gEl, g, "happy");
+    pz.body(meEl, "jump");
+    pz.body(gEl, "jump");
+    pz.fx(gEl, "note", 2);
+    const context = isFriend(me.owner, g.owner) ? "meetFriend" : "meetNew";
+    pz.say(meEl, sceneLine(me, context, g), 3000);
+    await wait(900);
+    pz.say(gEl, sceneLine(g, context, me), 3000);
+    me.stats.friendship = clamp(me.stats.friendship + 2);
+    addLog(me.name + "가 산책로에서 " + g.owner + "의 " + g.name + "에게 인사했어요.");
+    save();
+    await wait(1100);
+    if (gen !== plz.gen) return;
+    pz.frame(meEl, me);
+    pz.frame(gEl, g);
+    pz.body(meEl, "");
+    pz.body(gEl, "");
+    plz.busy = false;
+    if (!isFriend(state.wallet, g.owner)) toast(g.owner + "와 아직 친구가 아니에요. 아래 카드에서 친구 맺기를 누르면 친구가 돼요.");
+  }
+  function befriend(w) {
+    if (!wallets.includes(w) || w === state.wallet) return;
+    state.friends = state.friends || [];
+    const key = friendKey(state.wallet, w);
+    if (state.friends.includes(key)) return;
+    state.friends.push(key);
+    addLog(state.wallet + "와 " + w + "가 산책로에서 친구가 됐어요.");
+    save();
+    refreshPlaza();
+    const g = plazaGuest(w), el = g && pz.el(g.id);
+    if (el) {
+      pz.frame(el, g, "happy");
+      pz.body(el, "jump");
+      pz.fx(el, "heart", 4);
+      pz.say(el, sceneLine(g, "friendMade", selected()), 3000);
+      setTimeout(() => { pz.frame(el, g); pz.body(el, ""); }, 1200);
+    }
+    toast(w + "와 친구가 됐어요. 이제 만남에서 " + (g ? g.name : w + "의 뉴로링") + "을(를) 고를 수 있어요.");
+  }
+  function unfriend(w) {
+    state.friends = (state.friends || []).filter((k) => k !== friendKey(state.wallet, w));
+    addLog(state.wallet + "와 " + w + "의 친구 관계가 해제됐어요.");
+    save();
+    refreshPlaza();
+    toast(w + "와의 친구 관계를 해제했어요.");
+  }
+  /* =========================================================
+     향기 실험실: 버섯체 연합학습 미션
+     향기 → KC(희소 부호) → MBON(접근 가치), DAN 보상이 KC→MBON 가소성만 바꾼다.
+     배고픔은 기억을 바꾸지 않고 '표현(인출)'만 조절한다.
+     ========================================================= */
+  const KC_N = 12;
+  const ODORS = {
+    A: { name: "딸기 향", short: "딸기", kc: [0, 2, 4, 7, 9], color: "#e58fa6", center: "#fff3b0" },
+    B: { name: "민트 향", short: "민트", kc: [1, 5, 6, 8, 11], color: "#7fc2b5", center: "#f4fbff" },
+    A2: { name: "산딸기 향", short: "산딸기", kc: [0, 2, 4, 7, 10], color: "#b789c9", center: "#fff3b0" },
+  };
+  function odorOf(p) {
+    if (!p.odor || !Array.isArray(p.odor.w)) {
+      const rnd = seeded(hashStr(p.id + ":odor"));
+      p.odor = { w: Array.from({ length: KC_N }, () => r2(0.46 + rnd() * 0.08)), tests: [], pairs: 0, ext: 0, mint: 0 };
+    }
+    return p.odor;
+  }
+  const odorValue = (o, key) => ODORS[key].kc.reduce((a, k) => a + o.w[k], 0) / ODORS[key].kc.length;
+  const gateOf = (hunger) => 0.25 + 0.75 * hunger;
+  function choiceProb(p, x, y, hunger) {
+    const o = odorOf(p), d = (odorValue(o, x) - odorValue(o, y)) * gateOf(hunger) * 10;
+    return 1 / (1 + Math.exp(-d));
+  }
+  const hungerOf = (p) => Math.max(0, Math.min(1, 1 - p.stats.food / 100));
+  const LAB = { gen: 0, busy: false, flash: null };
+  function flowerSvg(key) {
+    const c = ODORS[key].color, m = ODORS[key].center, g = "#7f9b78";
+    const rows = [
+      "..pp.pp..", ".pppppppp", "pppmmmppp", ".ppmmmpp.", "pppmmmppp", ".pppppppp", "..pp.pp..",
+      "....s....", "..l.s....", "..lls.ll.", "....sll..", "....s....",
+    ];
+    let s = "";
+    rows.forEach((row, y) => [...row].forEach((ch, x) => {
+      const col = ch === "p" ? c : ch === "m" ? m : ch === "s" || ch === "l" ? g : null;
+      if (col) s += '<rect x="' + x + '" y="' + y + '" width="1" height="1" fill="' + col + '"/>';
+    }));
+    return '<svg viewBox="0 0 9 12" shape-rendering="crispEdges">' + s + "</svg>";
+  }
+  function labStepState(o) {
+    const has = (k) => o.tests.some((t) => t.kind === k);
+    return [has("base"), o.pairs >= 3, has("retest"), has("hungry") && has("full"), has("transfer") || o.ext > 0];
+  }
+  function mbSvg(p, active) {
+    const o = odorOf(p);
+    const act = active ? ODORS[active].kc : [];
+    let s = '<svg class="mb-svg" viewBox="0 0 380 200" role="img" aria-label="버섯체 모델: 향기 입력, 케니언 세포 12개, 출력 뉴런">';
+    s += '<text class="col" x="40" y="14" text-anchor="middle">향기(PN)</text><text class="col" x="190" y="14" text-anchor="middle">케니언 세포 KC 12개 · 막대 = KC→MBON 가소성</text><text class="col" x="345" y="14" text-anchor="middle">MBON</text>';
+    ["A", "B", "A2"].forEach((key, i) => {
+      const y = 40 + i * 52;
+      s += '<g class="odor-node' + (active === key ? " on" : "") + '"><rect x="16" y="' + (y - 14) + '" width="48" height="28" style="fill:' + ODORS[key].color + '"/><text x="40" y="' + (y + 4) + '" text-anchor="middle" class="odor-label">' + ODORS[key].short + "</text></g>";
+    });
+    for (let k = 0; k < KC_N; k++) {
+      const col = k % 6, row = Math.floor(k / 6), x = 98 + col * 34, y = 34 + row * 82;
+      const inA = ODORS.A.kc.includes(k), inB = ODORS.B.kc.includes(k), on = act.includes(k);
+      const h = Math.round(o.w[k] * 40);
+      s += '<g class="kc' + (on ? " on" : "") + '"><rect class="kc-cell" x="' + x + '" y="' + y + '" width="22" height="22" style="fill:' + (inA ? "#f7d3dd" : inB ? "#d2ece6" : "#e6e1ee") + '"/>' +
+        '<rect class="kc-bar-bg" x="' + (x + 7) + '" y="' + (y + 26) + '" width="8" height="40"/><rect class="kc-bar" x="' + (x + 7) + '" y="' + (y + 66 - h) + '" width="8" height="' + h + '"/></g>';
+      if (on) s += '<line class="mb-edge" x1="64" y1="' + (40 + ["A", "B", "A2"].indexOf(active) * 52) + '" x2="' + x + '" y2="' + (y + 11) + '"/><line class="mb-edge out" x1="' + (x + 22) + '" y1="' + (y + 11) + '" x2="322" y2="100"/>';
+    }
+    s += '<g class="mbon' + (active ? " on" : "") + '"><rect x="322" y="80" width="46" height="40"/><text x="345" y="98" text-anchor="middle">접근</text><text x="345" y="112" text-anchor="middle" class="sub">가치</text></g>';
+    s += '<g class="dan' + (LAB.flash === "dan" ? " on" : "") + '"><rect x="322" y="150" width="46" height="34"/><text x="345" y="166" text-anchor="middle">DAN</text><text x="345" y="178" text-anchor="middle" class="sub">보상</text></g>';
+    return s + "</svg>";
+  }
+  function labTests(o) {
+    if (!o.tests.length) return '<p class="lab-empty">아직 측정 기록이 없어요. ① 학습 전 선호 측정부터 시작해 보세요.</p>';
+    return '<ul class="lab-results">' + o.tests.slice(-6).map((t) =>
+      '<li><span class="lr-label">' + esc(t.label) + '</span><span class="lr-bar"><i style="width:' + Math.round(t.rate * 100) + '%;background:' + ODORS[t.x].color + '"></i><u style="left:50%"></u></span><b>' + ODORS[t.x].short + " " + Math.round(t.rate * 10) + "/10<small>모델 " + Math.round((t.prob || 0) * 100) + "%</small></b></li>").join("") + "</ul>";
+  }
+  function labPanel(p) {
+    const o = odorOf(p), steps = labStepState(o), next = steps.indexOf(false);
+    const base = o.tests.find((t) => t.kind === "base"), re = [...o.tests].reverse().find((t) => t.kind === "retest");
+    const st = (i, title, desc, buttons) =>
+      '<li class="lab-step ' + (steps[i] ? "done" : i === next ? "next" : "") + '"><span class="ls-num">' + (steps[i] ? icon("check") : i + 1) + "</span><div><strong>" + title + "</strong><small>" + desc + '</small><div class="ls-btns">' + buttons + "</div></div></li>";
+    const b = (action, label, cls = "", extra = "") => button(action, label, "small " + cls, extra);
+    return (
+      '<ol class="lab-steps">' +
+      st(0, "학습 전 선호 측정", "딸기 향과 민트 향을 함께 놓고 10번 고르게 해요.", b("lab-test", "측정하기 (10회)", "", 'data-kind="base"')) +
+      st(1, "연합 학습 " + Math.min(o.pairs, 3) + "/3", "딸기 향을 맡게 하며 당근을 줘요. 도파민 보상이 딸기 KC의 연결만 강화해요.", b("lab-pair", icon("carrot") + " 딸기 향 + 당근", "primary") + b("lab-mint", "민트 향만 맡게 하기")) +
+      st(2, "재검사", "같은 조건에서 다시 10번 골라요.", b("lab-test", "다시 측정", "", 'data-kind="retest"')) +
+      st(3, "상태 비교", "기억은 그대로, 배고픔만 바꿔서 검사해요.", b("lab-test", "배고플 때", "", 'data-kind="hungry"') + b("lab-test", "배부를 때", "", 'data-kind="full"')) +
+      st(4, "전이 · 소거", "비슷한 산딸기 향을 시험하거나, 보상 없이 딸기 향만 반복해요.", b("lab-test", "산딸기 vs 민트", "", 'data-kind="transfer"') + b("lab-extinct", "보상 없이 딸기 향")) +
+      "</ol>" +
+      '<div class="ls-reset">' + b("lab-reset", "실험 초기화") + "</div>" +
+      (base && re ? '<p class="lab-summary">' + icon("spark") + " 학습 효과: 딸기 선택률 " + Math.round(base.rate * 100) + "% → " + Math.round(re.rate * 100) + "% (" + (re.rate - base.rate >= 0 ? "+" : "") + Math.round((re.rate - base.rate) * 100) + "%p)</p>" : "")
+    );
+  }
+  function lab() {
+    const p = selected(), o = odorOf(p);
+    const ownOk = p.owner === state.wallet && p.stage >= 1;
+    return (
+      heading("", "향기 실험실",
+        esc(p.name) + "와 함께하는 버섯체 연합학습 미션이에요. 향기와 먹이를 짝지으면 그 향기의 가치가 학습되고, 배고픔은 그 기억이 행동으로 드러나는 정도를 바꿔요.",
+        button("go-home", icon("home") + " 정원으로 돌아가기", "small")) +
+      (ownOk ? "" : '<section class="panel empty-state">' + icon("paw") + "<h2>내 뉴로링을 골라 주세요</h2><p>아기 단계 이상인 내 뉴로링만 실험할 수 있어요.</p></section>") +
+      '<div class="lab-grid"><section class="panel stage-panel"><div class="stage plaza lab" id="stage">' +
+      '<div class="stars" id="stars"></div><div class="layer far" id="layer-far"></div><div class="layer near" id="layer-near"></div><div class="mist"></div>' +
+      '<div class="ground"></div><div class="ground-deco" id="ground-deco"></div><div class="motes" id="motes"></div>' +
+      '<div class="flower fl-left" id="flower-left">' + flowerSvg("A") + '<span class="fl-tag" id="tag-left">딸기 향</span></div>' +
+      '<div class="flower fl-right" id="flower-right">' + flowerSvg("B") + '<span class="fl-tag">민트 향</span></div>' +
+      '<div class="lab-tally" id="lab-tally"></div>' +
+      '<div class="lab-state">' + icon("carrot") + " 포만감 " + Math.round(p.stats.food) + " · 당근 " + state.food + "</div>" +
+      "</div>" + (ownOk ? '<div class="lab-controls" id="lab-controls">' + labPanel(p) + "</div>" : "") + "</section>" +
+      '<aside class="panel lab-side"><div class="brain-head"><div><h2>' + icon("neuron") + " 버섯체 모델</h2><p>향기 → KC → MBON. 학습은 KC→MBON 막대에만 남아요.</p></div></div>" +
+      '<div id="mb-wrap">' + mbSvg(p, null) + "</div>" +
+      '<div class="temper-title"><span>측정 기록</span><small>막대 = 실제 10회 · 모델 = 선택 확률</small></div><div id="lab-tests">' + labTests(o) + "</div>" +
+      '<p class="brain-note">KC 12개로 줄인 체험용 버섯체 모델이에요. 실제 FlyWire 회로로 교체할 예정이며, 기록은 이 뉴로링의 시뮬레이션 결과예요.</p></aside></div>'
+    );
+  }
+  function refreshLab(active) {
+    const p = selected(), o = odorOf(p);
+    const set = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+    set("mb-wrap", mbSvg(p, active || null));
+    set("lab-tests", labTests(o));
+    set("lab-controls", labPanel(p));
+    const ls = $(".lab-state");
+    if (ls) ls.innerHTML = icon("carrot") + " 포만감 " + Math.round(p.stats.food) + " · 당근 " + state.food;
+  }
+  function mountLab() {
+    const stage = $("#stage");
+    if (!stage) return;
+    LAB.gen++;
+    paintScenery();
+    const p = selected();
+    if (p.owner !== state.wallet || p.stage < 1) return;
+    const el = plazaPetEl(p, 50, true);
+    el.querySelector(".owner-tag")?.remove();
+    stage.append(el);
+    pz.say(el, arrivalLine(p, "labEnter"), 3000);
+    plz.gen++;
+    plazaBlink(plz.gen);
+  }
+  async function labRun(kind) {
+    const p = selected();
+    if (LAB.busy || p.owner !== state.wallet || p.stage < 1) return;
+    const o = odorOf(p);
+    const x = kind === "transfer" ? "A2" : "A";
+    const hunger = kind === "hungry" ? 0.85 : kind === "full" ? 0.05 : hungerOf(p);
+    const label = { base: "학습 전", retest: "재검사", hungry: "배고플 때", full: "배부를 때", transfer: "산딸기(전이)" }[kind] + " · 배고픔 " + Math.round(hunger * 100) + "%";
+    const prob = choiceProb(p, x, "B", hunger);
+    const el = pz.el(p.id), tally = $("#lab-tally");
+    LAB.busy = true;
+    $(".lab-controls")?.classList.add("busy");
+    const tagL = $("#tag-left"), flL = $("#flower-left");
+    if (flL) flL.innerHTML = flowerSvg(x) + '<span class="fl-tag" id="tag-left">' + ODORS[x].name + "</span>";
+    refreshLab(x);
+    let hits = 0;
+    const gen = plz.gen;
+    for (let i = 0; i < 10; i++) {
+      const pickA = Math.random() < prob;
+      if (pickA) hits++;
+      if (el && !reduce()) {
+        await pz.move(el, p, pickA ? 27 : 73, gen, 0.9);
+        pz.body(el, "munch");
+        if (pickA && i % 3 === 0) pz.fx(el, "heart", 1);
+        await wait(140);
+        pz.body(el, "");
+      }
+      if (tally) tally.innerHTML = '<span style="color:' + ODORS[x].color + '">' + ODORS[x].short + " " + hits + "</span> : " + (i + 1 - hits) + " 민트 <small>(" + (i + 1) + "/10)</small>";
+    }
+    if (el && !reduce()) await pz.move(el, p, 50, gen, 0.9);
+    o.tests.push({ kind, x, label, rate: hits / 10, prob: r2(prob), at: Date.now() });
+    o.tests = o.tests.slice(-20);
+    addLog(p.name + " 향기 실험 · " + label + ": " + ODORS[x].short + " " + hits * 10 + "%");
+    save();
+    LAB.busy = false;
+    $(".lab-controls")?.classList.remove("busy");
+    refreshLab(null);
+    if (el) {
+      const base = o.tests.find((t) => t.kind === "base");
+      pz.say(el, labResultLine(p, kind, hits, x, base), 3000);
+    }
+    toast(label + " → " + ODORS[x].short + " 선택 " + hits + "/10회");
+  }
+  async function labPair() {
+    const p = selected();
+    if (LAB.busy || p.owner !== state.wallet || p.stage < 1) return;
+    if (state.food < 1) {
+      pz.say(pz.el(p.id), momentLine(p, "noFood"), 3000);
+      return toast("당근이 없어요. 정원에서 재우거나 산책하면 다시 모여요.");
+    }
+    const foodBefore = p.stats.food;
+    const o = odorOf(p), hunger = hungerOf(p), rwd = 0.6 + 0.4 * hunger;
+    LAB.busy = true;
+    const el = pz.el(p.id), gen = plz.gen;
+    const flL = $("#flower-left");
+    if (flL) flL.innerHTML = flowerSvg("A") + '<span class="fl-tag" id="tag-left">딸기 향</span>';
+    refreshLab("A");
+    if (el && !reduce()) {
+      await pz.move(el, p, 27, gen, 0.6);
+      pz.fx(el, "spark", 1);
+      await wait(300);
+    }
+    ODORS.A.kc.forEach((k) => (o.w[k] = r2(o.w[k] + 0.35 * rwd * (1 - o.w[k]))));
+    o.pairs++;
+    state.food--;
+    p.stats.food = clamp(p.stats.food + 6);
+    p.feeds = (p.feeds || 0) + 1;
+    const res = stimulate(p, 4);
+    res.k = 2;
+    learn(p, res, rwd);
+    LAB.flash = "dan";
+    refreshLab("A");
+    if (el) {
+      pz.frame(el, p, "happy");
+      pz.body(el, "munch");
+      pz.fx(el, "food", 1);
+      pz.say(el, labPairLine(p, foodBefore), 3000);
+    }
+    addLog(p.name + " 연합 학습 " + o.pairs + "회: 딸기 향 + 당근 (보상 " + rwd.toFixed(2) + ")");
+    save();
+    await wait(900);
+    LAB.flash = null;
+    if (el) { pz.frame(el, p); pz.body(el, ""); if (!reduce()) await pz.move(el, p, 50, gen, 0.6); }
+    refreshLab(null);
+    LAB.busy = false;
+    const fresh = syncTraits(p);
+    if (fresh.length) announceTraits(p, fresh);
+  }
+  async function labExtinct(which) {
+    const p = selected();
+    if (LAB.busy || p.owner !== state.wallet || p.stage < 1) return;
+    const o = odorOf(p), key = which === "mint" ? "B" : "A";
+    LAB.busy = true;
+    const el = pz.el(p.id), gen = plz.gen;
+    refreshLab(key);
+    if (el && !reduce()) await pz.move(el, p, key === "A" ? 27 : 73, gen, 0.6);
+    ODORS[key].kc.forEach((k) => (o.w[k] = r2(o.w[k] - 0.2 * (o.w[k] - 0.3))));
+    if (key === "A") o.ext++;
+    else o.mint++;
+    if (el) pz.say(el, momentLine(p, key === "B" ? "labMint" : o.pairs > 0 ? "labNoRewardKnown" : "labNoRewardNew"), 3000);
+    addLog(p.name + (key === "A" ? " 소거 학습: 보상 없이 딸기 향" : " 민트 향만 노출(보상 없음)"));
+    save();
+    await wait(700);
+    if (el && !reduce()) await pz.move(el, p, 50, gen, 0.6);
+    refreshLab(null);
+    LAB.busy = false;
+  }
+  function labReset() {
+    const p = selected();
+    if (LAB.busy) return;
+    delete p.odor;
+    odorOf(p);
+    save();
+    render();
+    toast(p.name + "의 향기 기억을 처음 상태로 되돌렸어요.");
+  }
   function collection() {
     const shown =
       state.filter === "mine"
         ? mine()
-        : state.pets.filter((p) => p.owner !== "escrow");
+        : state.filter === "friends"
+          ? state.pets.filter((p) => p.owner !== state.wallet && p.owner !== "escrow" && isFriend(state.wallet, p.owner))
+          : state.pets.filter((p) => p.owner !== "escrow");
     return (
       heading(
         "",
@@ -1385,7 +2103,15 @@
       (state.filter === "mine" ? "active" : "") +
       '" data-action="filter" data-filter="mine">나의 친구 ' +
       mine().length +
-      '</button></div><div class="collection-grid">' +
+      '</button><button class="filter-button ' +
+      (state.filter === "friends" ? "active" : "") +
+      '" data-action="filter" data-filter="friends">친구 계정 ' +
+      friendsOf(state.wallet).length +
+      "</button></div>" +
+      (state.filter === "friends" && !friendsOf(state.wallet).length
+        ? '<section class="panel empty-state">' + icon("paw") + "<h2>아직 친구가 없어요</h2><p>정원에서 산책 가기를 누르면 산책로 광장에서 다른 계정의 뉴로링을 만나고, 친구 맺기를 할 수 있어요.</p></section>"
+        : "") +
+      '<div class="collection-grid">' +
       shown
         .map(
           (p) =>
@@ -1399,6 +2125,7 @@
             types[p.type].name +
             " · " +
             esc(p.owner) +
+            (p.owner !== state.wallet && isFriend(state.wallet, p.owner) ? " · " + icon("heart") + " 친구" : "") +
             '</p><div class="stats">' +
             stats(p) +
             "</div>" +
@@ -1414,9 +2141,9 @@
       "</div>"
     );
   }
-  function parentOptions(value) {
+  function parentOptions(value, which) {
     return state.pets
-      .filter((p) => p.stage >= 2 && p.owner !== "escrow")
+      .filter((p) => p.stage >= 2 && p.owner !== "escrow" && (which !== "b" || isFriend(state.wallet, p.owner)))
       .map(
         (p) =>
           '<option value="' +
@@ -1440,7 +2167,7 @@
       '" aria-label="' +
       (which === "a" ? "첫 번째" : "두 번째") +
       ' 부모 선택">' +
-      parentOptions(p.id) +
+      parentOptions(p.id, which) +
       "</select><small>" +
       types[p.type].name +
       " · " +
@@ -1662,8 +2389,9 @@
       datingA = (
         candidates.find((p) => p.owner === state.wallet) || candidates[0]
       ).id;
-    if (!datingB || !petById(datingB))
-      datingB = (candidates.find((p) => p.id !== datingA) || candidates[0]).id;
+    const okB = (p) => p && p.stage >= 2 && p.owner !== "escrow" && isFriend(state.wallet, p.owner);
+    if (!datingB || !okB(petById(datingB)))
+      datingB = (candidates.find((p) => p.id !== datingA && okB(p)) || candidates.find((p) => p.id !== datingA) || candidates[0]).id;
     const req = state.request,
       a = petById(req ? req.a : datingA),
       b = petById(req ? req.b : datingB);
@@ -1715,7 +2443,7 @@
       steps =
         '<div class="step-info">' +
         icon("leaf") +
-        " 먼저 서로를 알아가는 작은 만남부터 시작해요.<br>같은 소유자의 서로 다른 두 친구도 함께할 수 있어요.</div>" +
+        " 먼저 서로를 알아가는 작은 만남부터 시작해요.<br>내 뉴로링끼리, 또는 산책로에서 친구를 맺은 계정의 뉴로링과 만날 수 있어요." + (friendsOf(state.wallet).length ? "" : "<br><b>아직 친구 계정이 없어요.</b> 정원에서 산책 가기를 눌러 친구를 만들어 보세요.") + "</div>" +
         button("request", icon("heart") + " 만남 요청하기", "primary wide");
     return (
       heading(
@@ -1890,11 +2618,14 @@
       shouldRestore = main.contains(focus);
     main.innerHTML =
       '<div class="enter">' +
-      ({ home, collection, traits, dating, eggs, family }[route] || home)() +
+      ({ home, collection, traits, dating, eggs, family, plaza, lab }[route] || home)() +
       "</div>";
     document.body.classList.toggle("night", !!state.night);
+    plz.gen++;
     if (route === "home") mountStage();
     else stg.gen++;
+    if (route === "plaza") mountPlaza();
+    if (route === "lab") mountLab();
     document.querySelectorAll("[data-route]").forEach((a) => {
       const active = a.dataset.route === route;
       a.classList.toggle("active", active);
@@ -1909,6 +2640,8 @@
         dating: "새로운 만남",
         eggs: "알 보관함",
         family: "우리의 이야기",
+        plaza: "산책로 광장",
+        lab: "향기 실험실",
       }[route] || "나의 정원";
     $("#wallet-select").value = state.wallet;
     $("#wallet-avatar").textContent = state.wallet.replace("user", "");
@@ -2103,6 +2836,8 @@
       return toast("첫 번째 친구의 소유자(" + a.owner + ")로 전환해 주세요.");
     if (a.stage < 2 || b.stage < 2)
       return toast("성장기 이상의 친구끼리 만날 수 있어요.");
+    if (!isFriend(a.owner, b.owner))
+      return toast(b.owner + "와 아직 친구가 아니에요. 산책로 광장에서 친구 맺기를 먼저 해 주세요.");
     state.request = {
       a: a.id,
       b: b.id,
@@ -2341,11 +3076,40 @@
         save();
         render();
         break;
+      case "plaza-greet":
+        plazaGreet(target.dataset.pet);
+        break;
+      case "befriend":
+        befriend(target.dataset.user);
+        break;
+      case "unfriend":
+        unfriend(target.dataset.user);
+        break;
+      case "go-home":
+        stg.back = route === "lab" ? "labReturn" : "plazaReturn";
+        navigate("home");
+        break;
       case "visit":
         state.selected = p.id;
         save();
         navigate("home");
         break;
+      case "lab-test":
+        labRun(target.dataset.kind);
+        break;
+      case "lab-pair":
+        labPair();
+        break;
+      case "lab-mint":
+        labExtinct("mint");
+        break;
+      case "lab-extinct":
+        labExtinct("A");
+        break;
+      case "lab-reset":
+        labReset();
+        break;
+      case "scent":
       case "pat":
       case "feed":
       case "play":
@@ -2412,7 +3176,7 @@
         gallery(target.dataset.gallery);
         break;
       case "filter":
-        state.filter = target.dataset.filter === "mine" ? "mine" : "all";
+        state.filter = ["mine", "friends"].includes(target.dataset.filter) ? target.dataset.filter : "all";
         save();
         render();
         break;
@@ -2533,7 +3297,7 @@
   function readRoute() {
     const hash = location.hash.slice(1);
     if (dialog.open) dialog.close();
-    route = ["home", "collection", "traits", "dating", "eggs", "family"].includes(hash)
+    route = ["home", "collection", "traits", "dating", "eggs", "family", "plaza", "lab"].includes(hash)
       ? hash
       : "home";
     if (hash.startsWith("claim=")) {
