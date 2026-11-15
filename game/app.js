@@ -548,20 +548,20 @@
     );
   }
   /* =========================================================
-     커넥톰 학습 (FlyWire 서브그래프를 줄인 데모 회로)
+     커넥톰 학습 (FlyWire 연구로 알려진 경로를 참고한 추상 12노드 모델, 실측 회로 아님)
      감각 5 → 중추 3 → 행동 4. 상호작용 = 감각 입력, 결과 보상으로 헤비안 학습.
      ========================================================= */
   const SENSES = [
-    { name: "기계감각", verb: "pat" },
-    { name: "미각", verb: "feed" },
-    { name: "시각", verb: "play" },
-    { name: "청각", verb: "call" },
-    { name: "후각", verb: "walk" },
+    { name: "기계감각", verb: "pat", tip: "기계감각 → 감각운동 경로 · 쓰다듬기의 접촉 신호" },
+    { name: "미각", verb: "feed", tip: "미각 수용 → 섭식 회로, 보상 관련 DAN · 먹이 주기" },
+    { name: "시각", verb: "play", tip: "시각엽 → 시각운동 회로 · 함께 놀기의 움직임 추적" },
+    { name: "청각", verb: "call", tip: "존스턴 기관의 소리·진동 감지 · 이름 부르기(언어 이해는 게임 추상화)" },
+    { name: "후각", verb: "walk", tip: "더듬이엽(AL) → 투사뉴런(PN) · 산책의 냄새 단서" },
   ];
   const HUBS = [
-    { name: "버섯체", sub: "학습·기억" },
-    { name: "측뿔", sub: "본능" },
-    { name: "중심복합체", sub: "이동·방향" },
+    { name: "버섯체", sub: "학습·기억", tip: "버섯체(MB): 케니언 세포(KC)·출력뉴런(MBON), 냄새 연합학습과 기억" },
+    { name: "측뿔", sub: "본능", tip: "측뿔(LH): 학습 이전의 선천적 후각 행동" },
+    { name: "중심복합체", sub: "이동·방향", tip: "중심복합체(CX): 방향 표상·항법·행동 조절" },
   ];
   const OUTS = [
     { name: "둘러보기", tem: "탐색", color: "#8eb2b4" },
@@ -1098,15 +1098,15 @@
       }),
     );
     SENSES.forEach((sn, i) => {
-      s += '<g class="b-node" id="n-in-' + i + '" style="--c:#a99ccb"><rect class="box" x="' + (BX.in - 10) + '" y="' + (inY(i) - 10) + '" width="20" height="20"/><text x="' + (BX.in - 16) + '" y="' + (inY(i) + 4) + '" text-anchor="end">' + sn.name + "</text></g>";
+      s += '<g class="b-node" id="n-in-' + i + '" style="--c:#a99ccb"><title>' + sn.tip + '</title><rect class="box" x="' + (BX.in - 10) + '" y="' + (inY(i) - 10) + '" width="20" height="20"/><text x="' + (BX.in - 16) + '" y="' + (inY(i) + 4) + '" text-anchor="end">' + sn.name + "</text></g>";
     });
     HUBS.forEach((hb, j) => {
-      s += '<g class="b-node" id="n-hub-' + j + '" style="--c:#8eb2b4"><rect class="box" x="' + (BX.hub - 12) + '" y="' + (hubY(j) - 12) + '" width="24" height="24"/><text x="' + BX.hub + '" y="' + (hubY(j) + 25) + '" text-anchor="middle">' + hb.name + '</text><text class="sub" x="' + BX.hub + '" y="' + (hubY(j) + 36) + '" text-anchor="middle">' + hb.sub + "</text></g>";
+      s += '<g class="b-node" id="n-hub-' + j + '" style="--c:#8eb2b4"><title>' + hb.tip + '</title><rect class="box" x="' + (BX.hub - 12) + '" y="' + (hubY(j) - 12) + '" width="24" height="24"/><text x="' + BX.hub + '" y="' + (hubY(j) + 25) + '" text-anchor="middle">' + hb.name + '</text><text class="sub" x="' + BX.hub + '" y="' + (hubY(j) + 36) + '" text-anchor="middle">' + hb.sub + "</text></g>";
     });
     const mx = last ? Math.max(...last.o) : 1;
     OUTS.forEach((o, k) => {
       const lv = last ? Math.max(2, Math.round((last.o[k] / mx) * 16)) : 0;
-      s += '<g class="b-node' + (last && last.k === k ? " win" : "") + '" id="n-out-' + k + '" style="--c:' + o.color + '"><rect class="box" x="' + (BX.out - 10) + '" y="' + (outY(k) - 10) + '" width="20" height="20"/>' +
+      s += '<g class="b-node' + (last && last.k === k ? " win" : "") + '" id="n-out-' + k + '" style="--c:' + o.color + '"><title>행동 출력 · ' + o.tem + ' 기질 (게임 행동 범주)</title><rect class="box" x="' + (BX.out - 10) + '" y="' + (outY(k) - 10) + '" width="20" height="20"/>' +
         (lv ? '<rect class="lvl" x="' + (BX.out - 8) + '" y="' + (outY(k) + 8 - lv) + '" width="16" height="' + lv + '"/>' : "") +
         '<text x="' + (BX.out + 16) + '" y="' + (outY(k) + 4) + '">' + o.name + "</text></g>";
     });
@@ -1186,7 +1186,7 @@
         ? b.log.slice(0, 3).map((l) => "<li><span>" + esc(l.t) + "</span><span>" + l.d + "</span></li>").join("")
         : '<li><span>아직 학습 기록이 없어요.</span><span></span></li>') +
       "</ul></div>" +
-      '<p class="brain-note">FlyWire 초파리 커넥톰(FAFB v783)의 감각→중추→행동 경로를 12개 노드로 줄인 체험용 회로예요. 진화 갈래도 이 기질로 정해져요.</p>'
+      '<p class="brain-note">FlyWire 연구로 알려진 감각→중추→행동 경로를 참고한 추상 12노드 모델이에요. 실측 회로나 실제 뇌 활동이 아니며, 불빛은 모델 예측 활성이에요. 노드에 마우스를 올리면 대응하는 뇌 영역이 보여요. 진화 갈래도 이 기질로 정해져요.</p>'
     );
   }
 
@@ -2003,12 +2003,84 @@
   }
   const hungerOf = (p) => Math.max(0, Math.min(1, 1 - p.stats.food / 100));
   const LAB = { gen: 0, busy: false, flash: null };
+  /* =========================================================
+     경험 지문(NeuroProof 로컬 미리보기)
+     실험 이벤트와 그 뒤의 KC→MBON 상태를 정해진 순서의 문자열로 만들고
+     SHA-256(이전 해시 포함)으로 잇는다. 온체인 기록이 아니라 브라우저 안의 해시 체인이다.
+     ========================================================= */
+  const PROOF_TAG = "HM-NEUROPROOF-v1", PROOF_MODEL = "mb-kc12-v1", PROOF_ZERO = "0".repeat(64);
+  function sha256hex(str) {
+    const K = [0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2];
+    const bytes = new TextEncoder().encode(str), len = bytes.length, total = ((len + 9 + 63) >> 6) << 6, m = new Uint8Array(total);
+    m.set(bytes);
+    m[len] = 0x80;
+    const bits = len * 8;
+    for (let i = 0; i < 8; i++) m[total - 1 - i] = Math.floor(bits / 2 ** (8 * i)) & 0xff;
+    const H = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19], w = new Uint32Array(64);
+    const rot = (x, n) => (x >>> n) | (x << (32 - n));
+    for (let off = 0; off < total; off += 64) {
+      for (let i = 0; i < 16; i++) w[i] = (m[off + 4 * i] << 24) | (m[off + 4 * i + 1] << 16) | (m[off + 4 * i + 2] << 8) | m[off + 4 * i + 3];
+      for (let i = 16; i < 64; i++) {
+        const s0 = rot(w[i - 15], 7) ^ rot(w[i - 15], 18) ^ (w[i - 15] >>> 3), s1 = rot(w[i - 2], 17) ^ rot(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+        w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0;
+      }
+      let [a, b, c, d, e, f, g, h] = H;
+      for (let i = 0; i < 64; i++) {
+        const t1 = (h + (rot(e, 6) ^ rot(e, 11) ^ rot(e, 25)) + ((e & f) ^ (~e & g)) + K[i] + w[i]) | 0;
+        const t2 = ((rot(a, 2) ^ rot(a, 13) ^ rot(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+        h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+      }
+      H[0] = (H[0] + a) | 0; H[1] = (H[1] + b) | 0; H[2] = (H[2] + c) | 0; H[3] = (H[3] + d) | 0;
+      H[4] = (H[4] + e) | 0; H[5] = (H[5] + f) | 0; H[6] = (H[6] + g) | 0; H[7] = (H[7] + h) | 0;
+    }
+    return H.map((x) => (x >>> 0).toString(16).padStart(8, "0")).join("");
+  }
+  // 정해진 필드 순서, 정수만(가중치·확률은 ×1000), 구분자 '|'
+  const proofBody = (petId, e) =>
+    [PROOF_TAG, e.prev, e.seq, petId, PROOF_MODEL, e.type, e.odor, e.hunger, e.result, e.w.join(",")].join("|");
+  const proofOf = (p) => (p.proof = p.proof || { events: [] });
+  function proofAdd(p, type, odor, hunger, result) {
+    const pr = proofOf(p), o = odorOf(p), last = pr.events[pr.events.length - 1];
+    const e = { seq: last ? last.seq + 1 : 1, prev: last ? last.hash : PROOF_ZERO, type, odor: odor || "-", hunger: Math.round(hunger * 1000), result: Math.round(result * 1000), w: o.w.map((x) => Math.round(x * 1000)), at: Date.now() };
+    e.hash = sha256hex(proofBody(p.id, e));
+    pr.events.push(e);
+    if (pr.events.length > 60) pr.events = pr.events.slice(-60);
+    return e;
+  }
+  // 저장된 기록을 처음부터 다시 해시해 사슬이 이어지는지 확인한다
+  function proofVerify(p) {
+    const ev = proofOf(p).events;
+    for (let i = 0; i < ev.length; i++) {
+      const e = ev[i];
+      if (i > 0 && (e.prev !== ev[i - 1].hash || e.seq !== ev[i - 1].seq + 1)) return { ok: false, at: e.seq, why: "연결" };
+      if (sha256hex(proofBody(p.id, e)) !== e.hash) return { ok: false, at: e.seq, why: "내용" };
+    }
+    return { ok: true, n: ev.length };
+  }
+  const PROOF_LABEL = { base: "학습 전 측정", retest: "재검사", hungry: "배고플 때", full: "배부를 때", transfer: "산딸기 전이", block: "가상 차단", pair: "향기+당근", extinct: "보상 없는 딸기", mint: "민트만", reset: "실험 초기화" };
+  function proofPanel(p) {
+    const ev = proofOf(p).events;
+    const head = ev.length ? ev[ev.length - 1].hash : PROOF_ZERO;
+    return (
+      '<div class="temper-title"><span>경험 지문</span><small>SHA-256 해시 체인 · 온체인 기록 아님</small></div>' +
+      (ev.length
+        ? '<ol class="proof-list">' + ev.slice(-4).reverse().map((e) => '<li><span class="pf-seq">#' + e.seq + '</span><span class="pf-type">' + (PROOF_LABEL[e.type] || e.type) + '</span><code title="' + e.hash + '">' + e.hash.slice(0, 10) + "…</code></li>").join("") + "</ol>" +
+          '<div class="proof-foot"><code title="' + head + '">최신 ' + head.slice(0, 16) + "…</code>" + button("lab-verify", icon("check") + " 다시 계산해 검증", "small") + "</div>"
+        : '<p class="lab-empty">실험을 하면 기록마다 지문이 생겨요. 각 지문은 이전 지문을 포함해서, 기록 하나만 고쳐도 뒤의 사슬이 모두 어긋나요.</p>')
+    );
+  }
+  function labVerify() {
+    const p = selected(), r = proofVerify(p);
+    if (r.ok) toast("경험 지문 " + r.n + "개를 다시 계산했어요. 모두 일치해요.");
+    else toast("#" + r.at + " 기록의 " + r.why + "이 맞지 않아요. 기록이 바뀌었을 수 있어요.");
+  }
+
   function flowerSvg(key) {
     return FIL.flower(ODORS[key].color, ODORS[key].center);
   }
   function labStepState(o) {
     const has = (k) => o.tests.some((t) => t.kind === k);
-    return [has("base"), o.pairs >= 3, has("retest"), has("hungry") && has("full"), has("transfer") || o.ext > 0];
+    return [has("base"), o.pairs >= 3, has("retest"), has("hungry") && has("full"), has("transfer") || o.ext > 0, has("block")];
   }
   function mbSvg(p, active) {
     const o = odorOf(p);
@@ -2038,7 +2110,7 @@
   }
   function labPanel(p) {
     const o = odorOf(p), steps = labStepState(o), next = steps.indexOf(false);
-    const base = o.tests.find((t) => t.kind === "base"), re = [...o.tests].reverse().find((t) => t.kind === "retest");
+    const base = o.tests.find((t) => t.kind === "base"), re = [...o.tests].reverse().find((t) => t.kind === "retest"), blk = [...o.tests].reverse().find((t) => t.kind === "block");
     const st = (i, title, desc, buttons) =>
       '<li class="lab-step ' + (steps[i] ? "done" : i === next ? "next" : "") + '"><span class="ls-num">' + (steps[i] ? icon("check") : i + 1) + "</span><div><strong>" + title + "</strong><small>" + desc + '</small><div class="ls-btns">' + buttons + "</div></div></li>";
     const b = (action, label, cls = "", extra = "") => button(action, label, "small " + cls, extra);
@@ -2049,9 +2121,11 @@
       st(2, "재검사", "같은 조건에서 다시 10번 골라요.", b("lab-test", "다시 측정", "", 'data-kind="retest"')) +
       st(3, "상태 비교", "기억은 그대로, 배고픔만 바꿔서 검사해요.", b("lab-test", "배고플 때", "", 'data-kind="hungry"') + b("lab-test", "배부를 때", "", 'data-kind="full"')) +
       st(4, "전이 · 소거", "비슷한 산딸기 향을 시험하거나, 보상 없이 딸기 향만 반복해요.", b("lab-test", "산딸기 vs 민트", "", 'data-kind="transfer"') + b("lab-extinct", "보상 없이 딸기 향")) +
+      st(5, "가상 차단", "학습 기억은 그대로 두고, 모델에서 버섯체 출력(KC→MBON)만 끈 채 다시 골라요. 학습 효과가 이 경로를 거쳤는지 비교해요.", b("lab-test", "출력 차단하고 측정", "", 'data-kind="block"')) +
       "</ol>" +
       '<div class="ls-reset">' + b("lab-reset", "실험 초기화") + "</div>" +
-      (base && re ? '<p class="lab-summary">' + icon("spark") + " 학습 효과: 딸기 선택률 " + Math.round(base.rate * 100) + "% → " + Math.round(re.rate * 100) + "% (" + (re.rate - base.rate >= 0 ? "+" : "") + Math.round((re.rate - base.rate) * 100) + "%p)</p>" : "")
+      (base && re ? '<p class="lab-summary">' + icon("spark") + " 학습 효과: 딸기 선택률 " + Math.round(base.rate * 100) + "% → " + Math.round(re.rate * 100) + "% (" + (re.rate - base.rate >= 0 ? "+" : "") + Math.round((re.rate - base.rate) * 100) + "%p)</p>" : "") +
+      (blk && re ? '<p class="lab-summary">' + icon("neuron") + " 가상 차단: 정상 " + Math.round(re.rate * 100) + "% → 차단 " + Math.round(blk.rate * 100) + "% (모델 " + Math.round(re.prob * 100) + "% → " + Math.round(blk.prob * 100) + "%)</p>" : "")
     );
   }
   function lab() {
@@ -2073,7 +2147,8 @@
       '<aside class="panel lab-side"><div class="brain-head"><div><h2>' + icon("neuron") + " 버섯체 모델</h2><p>향기 → KC → MBON. 학습은 KC→MBON 막대에만 남아요.</p></div></div>" +
       '<div id="mb-wrap">' + mbSvg(p, null) + "</div>" +
       '<div class="temper-title"><span>측정 기록</span><small>막대 = 실제 10회 · 모델 = 선택 확률</small></div><div id="lab-tests">' + labTests(o) + "</div>" +
-      '<p class="brain-note">KC 12개로 줄인 체험용 버섯체 모델이에요. 실제 FlyWire 회로로 교체할 예정이며, 기록은 이 뉴로링의 시뮬레이션 결과예요.</p></aside></div>'
+      '<div id="lab-proof">' + proofPanel(p) + "</div>" +
+      '<p class="brain-note">KC 12개로 줄인 추상 버섯체 모델이에요. 막대와 점등은 모델 계산값이며 실제 뉴런 활동이 아니에요. FlyWire 실측 부분회로는 뉴런 ID·연결표 검증 후 이식할 예정이에요.</p></aside></div>'
     );
   }
   function refreshLab(active) {
@@ -2082,6 +2157,7 @@
     set("mb-wrap", mbSvg(p, active || null));
     set("lab-tests", labTests(o));
     set("lab-controls", labPanel(p));
+    set("lab-proof", proofPanel(p));
     const ls = $(".lab-state");
     if (ls) ls.innerHTML = icon("carrot") + " 포만감 " + Math.round(p.stats.food) + " · 당근 " + state.food;
   }
@@ -2105,8 +2181,9 @@
     const o = odorOf(p);
     const x = kind === "transfer" ? "A2" : "A";
     const hunger = kind === "hungry" ? 0.85 : kind === "full" ? 0.05 : hungerOf(p);
-    const label = { base: "학습 전", retest: "재검사", hungry: "배고플 때", full: "배부를 때", transfer: "산딸기(전이)" }[kind] + " · 배고픔 " + Math.round(hunger * 100) + "%";
-    const prob = choiceProb(p, x, "B", hunger);
+    const label = { base: "학습 전", retest: "재검사", hungry: "배고플 때", full: "배부를 때", transfer: "산딸기(전이)", block: "출력 차단" }[kind] + " · 배고픔 " + Math.round(hunger * 100) + "%";
+    // 가상 차단: KC→MBON 출력이 없으면 학습된 가치 차이가 행동에 전달되지 않는다(선천 경로만 남음)
+    const prob = kind === "block" ? 0.5 : choiceProb(p, x, "B", hunger);
     const el = pz.el(p.id), tally = $("#lab-tally");
     LAB.busy = true;
     $(".lab-controls")?.classList.add("busy");
@@ -2130,6 +2207,7 @@
     if (el && !reduce()) await pz.move(el, p, 50, gen, 0.9);
     o.tests.push({ kind, x, label, rate: hits / 10, prob: r2(prob), at: Date.now() });
     o.tests = o.tests.slice(-20);
+    proofAdd(p, kind, x, hunger, hits / 10);
     addLog(p.name + " 향기 실험 · " + label + ": " + ODORS[x].short + " " + hits * 10 + "%");
     save();
     LAB.busy = false;
@@ -2137,7 +2215,7 @@
     refreshLab(null);
     if (el) {
       const base = o.tests.find((t) => t.kind === "base");
-      pz.say(el, labResultLine(p, kind, hits, x, base), 3000);
+      pz.say(el, kind === "block" ? momentLine(p, "labTie") : labResultLine(p, kind, hits, x, base), 3000);
     }
     toast(label + " → " + ODORS[x].short + " 선택 " + hits + "/10회");
   }
@@ -2162,6 +2240,7 @@
     }
     ODORS.A.kc.forEach((k) => (o.w[k] = r2(o.w[k] + 0.35 * rwd * (1 - o.w[k]))));
     o.pairs++;
+    proofAdd(p, "pair", "A", hunger, rwd);
     state.food--;
     p.stats.food = clamp(p.stats.food + 6);
     p.feeds = (p.feeds || 0) + 1;
@@ -2197,6 +2276,7 @@
     ODORS[key].kc.forEach((k) => (o.w[k] = r2(o.w[k] - 0.2 * (o.w[k] - 0.3))));
     if (key === "A") o.ext++;
     else o.mint++;
+    proofAdd(p, key === "A" ? "extinct" : "mint", key, hungerOf(p), 0);
     if (el) pz.say(el, momentLine(p, key === "B" ? "labMint" : o.pairs > 0 ? "labNoRewardKnown" : "labNoRewardNew"), 3000);
     addLog(p.name + (key === "A" ? " 소거 학습: 보상 없이 딸기 향" : " 민트 향만 노출(보상 없음)"));
     save();
@@ -2210,6 +2290,7 @@
     if (LAB.busy) return;
     delete p.odor;
     odorOf(p);
+    proofAdd(p, "reset", "-", hungerOf(p), 0);
     save();
     render();
     toast(p.name + "의 향기 기억을 처음 상태로 되돌렸어요.");
@@ -3257,6 +3338,9 @@
         break;
       case "lab-reset":
         labReset();
+        break;
+      case "lab-verify":
+        labVerify();
         break;
       case "scent":
       case "pat":

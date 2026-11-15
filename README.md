@@ -164,3 +164,36 @@ hatchmind.code-workspace를 열면 됩니다. 작업 실행 메뉴에서 HatchMi
 ## 공개 게임 링크
 
 [HatchMind 플레이하기](https://jinha381.github.io/Abraxas/) — 휴대폰과 PC 브라우저에서 설치·로그인 없이 플레이합니다. 온체인 연결과 유저 간 통신 없이 각자 기기에 진행 상황을 저장합니다. game/ 수정분을 main에 푸시하면 GitHub Pages가 자동 갱신됩니다.
+
+## NeuroVision 자료와 NeuroProof(확장)
+
+[docs/neurovision/](docs/neurovision/)에 뇌공학 담당(이윤지)이 만든 자료를 둡니다.
+
+- `HatchMind_NeuroVision_8s.webm`: FlyWire FAFB v783의 PN·KC SWC 형태 데이터로 그린 8초 시연 영상. 뉴런 형태는 실제 데이터이고, 빛·색의 이동은 학습 회로를 설명하는 교육용 연출입니다(실측 활성도 지도 아님).
+- `HatchMind_NeuroVision_해설.pdf`: 영상 해설과 NeuroProof·NeuroGenome 설계안.
+- `HatchMind_뇌구조_게임반응_설계.pdf`: 게임 행동별 관련 회로, 향기–보상 기억, 가상 회로 개입 실험 설계.
+
+NeuroProof는 펫의 경험과 가상 신경 회로 상태 변화를 SHA-256 해시 사슬로 고정해 펫 NFT와 연결하는 확장 설계입니다. 현재는 게임 안의 로컬 해시 사슬(경험 지문)만 구현했으며, 온체인 PDA 기록은 하지 않습니다. 형식은 [game/README.md](game/README.md#경험-지문-neuroproof-로컬-미리보기)에 있습니다.
+
+## 참고문헌
+
+기획서 본문의 대괄호 번호는 아래 목록을 가리킵니다.
+
+1. S. Dorkenwald et al., "Neuronal wiring diagram of an adult brain," Nature, 2024. https://www.nature.com/articles/s41586-024-07558-y
+2. FlyWire Codex FAFB v783 데이터셋. https://codex.flywire.ai/
+3. P. K. Shiu et al., "A Drosophila computational brain model reveals sensorimotor processing," Nature, 2024. https://www.nature.com/articles/s41586-024-07763-9
+4. T. Springer, M. Nawrot, "A mechanistic model for reward prediction and extinction learning," 2021. https://pubmed.ncbi.nlm.nih.gov/33785523/
+5. "Beyond prediction error: mushroom body learning models," 2024. https://pmc.ncbi.nlm.nih.gov/articles/PMC11199945/
+6. J. Felsenberg et al., "Re-evaluation of learned information in Drosophila," Nature, 2017. https://www.nature.com/articles/nature21716
+7. M. J. Krashes et al., "A neural circuit mechanism integrating motivational state with memory expression," Cell, 2009. https://pubmed.ncbi.nlm.nih.gov/19837040/
+8. "Deprivation state-specific expression of memories in Drosophila," 2019. https://pubmed.ncbi.nlm.nih.gov/31659341/
+9. D. L. Schacter, D. R. Addis, "Constructive memory and imagining the future," 2007. https://pubmed.ncbi.nlm.nih.gov/17395575/
+10. S. S. Kim et al., "Ring attractor dynamics in the Drosophila central brain," Science, 2017. https://pubmed.ncbi.nlm.nih.gov/28473639/
+11. Pr1nted, Open Fly: simulated FlyWire brain plays a strategy game, 2026. https://pr1nted.itch.io/open-fly
+12. FlyWire Citation & Release Guidelines (CC BY-NC 4.0). https://home.flywire.ai/guidelines
+13. J. M. Donlea, "Sleep and memory consolidation in insects," 2025. https://pubmed.ncbi.nlm.nih.gov/40975663/
+14. 팀 아프락사스, HatchMind 소스 저장소(컨트랙트·테스트·게임). https://github.com/jinha381/Abraxas
+15. 팀 아프락사스, HatchMind 플레이 링크(GitHub Pages). https://jinha381.github.io/Abraxas/
+16. 팀 아프락사스, 최종 로컬 테스트 결과. [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md)
+17. Metaplex Core / Solana PDA / Anchor 공식 문서. https://www.metaplex.com/docs/smart-contracts/core
+18. P. Schlegel et al., "Whole-brain annotation and multi-connectome cell typing of Drosophila," Nature, 2024. https://www.nature.com/articles/s41586-024-07686-5

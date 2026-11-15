@@ -846,3 +846,9 @@ body.night .tt-vine.on rect { fill: #e3cd8a; }
   .fil::before, .fil::after { width: 72px; height: 72px; }
   .flower svg { width: 58px; height: 90px; }
 }
+/* 경험 지문 */
+.proof-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.proof-list li { display: grid; grid-template-columns: 34px 1fr auto; gap: 8px; align-items: center; font-size: 11px; padding: 4px 8px; background: var(--paper-2); box-shadow: var(--px2); }
+.proof-list code, .proof-foot code { font-family: var(--font); font-size: 10px; color: var(--ink-soft); letter-spacing: .04em; }
+.pf-seq { color: var(--muted); }
+.proof-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
