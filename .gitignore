@@ -6,3 +6,4 @@ vendor/*.so
 vendor/*.json
 .local/
 *.keypair.json
+game/_backup/
