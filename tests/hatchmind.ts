@@ -7,6 +7,7 @@ import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import { keypairIdentity, publicKey } from "@metaplex-foundation/umi";
 import { mplCore, transferV1, fetchAssetV1, fetchAsset, addPlugin, burnV1, getMplCoreErrorFromCode } from "@metaplex-foundation/mpl-core";
 import { mkdirSync, writeFileSync } from "fs";
+import { costs, recordCosts } from "../validation/cost-recorder";
 
 describe("HatchMind local on-chain integration", function () {
   this.timeout(180000);
@@ -16,6 +17,7 @@ describe("HatchMind local on-chain integration", function () {
   assert.match(provider.connection.rpcEndpoint, /^http:\/\/(127\.0\.0\.1|localhost):/, "local validator only");
   anchor.setProvider(provider);
   const program = anchor.workspace.Hatchmind as anchor.Program<Hatchmind>;
+  recordCosts(provider, program);
   const core = new PublicKey("CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d");
   const user1 = Keypair.generate(), user2 = Keypair.generate(), user3 = Keypair.generate(), user4 = Keypair.generate();
   const stranger = Keypair.generate();
@@ -596,6 +598,33 @@ describe("HatchMind local on-chain integration", function () {
         }
       }
       note("C03", { verdict: results.some(r => r.succeeded) ? "RISK 재현" : "관찰", results });
+    });
+    it("O02: 명령 10개의 성공 트랜잭션 CU·신규 계정 rent를 실제 측정", async () => {
+      const instructions = program.idl.instructions.map(ix => ix.name);
+      assert.lengthOf(instructions, 10);
+      for (const name of instructions) {
+        const samples = costs.filter(s => s.instruction === name);
+        assert.isNotEmpty(samples, name + "의 성공 트랜잭션 측정 누락");
+        for (const sample of samples) {
+          assert.isAbove(sample.compute_units, 0);
+          assert.isString(sample.signature);
+          for (const account of sample.created) assert.isAtLeast(account.lamports, account.rent_exempt_minimum);
+        }
+      }
+      note("O02", { verdict: "PASS", instruction_count: instructions.length, successful_samples: costs.length });
+    });
+    it("O03: BirthEvent child·parents·seed가 실제 자식 PetRecord와 일치", async () => {
+      const tx = await provider.connection.getTransaction(successfulBirth.signature, { commitment: "confirmed", maxSupportedTransactionVersion: 0 });
+      assert.isNull(tx!.meta!.err);
+      const events = [...new anchor.EventParser(program.programId, program.coder).parseLogs(tx!.meta!.logMessages!)];
+      const births = events.filter(event => event.name.toLowerCase() === "birthevent");
+      assert.lengthOf(births, 1);
+      const event: any = births[0].data, record = await program.account.petRecord.fetch(pet(successfulBirth.asset.publicKey));
+      assert.equal(event.child.toBase58(), record.asset.toBase58());
+      assert.equal(event.parentA.toBase58(), record.parentA.toBase58());
+      assert.equal(event.parentB.toBase58(), record.parentB.toBase58());
+      assert.deepEqual(event.seed, record.seed);
+      note("O03", { verdict: "PASS", signature: successfulBirth.signature, matched_fields: ["child", "parent_a", "parent_b", "seed"] });
     });
   });
 });

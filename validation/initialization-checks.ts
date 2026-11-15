@@ -1,6 +1,6 @@
 ﻿import * as anchor from "@coral-xyz/anchor";
 import { assert } from "chai";
-import { Keypair, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
+import { Keypair, PublicKey, SystemProgram, Transaction, TransactionMessage, VersionedTransaction } from "@solana/web3.js";
 import type { Hatchmind } from "../target/types/hatchmind";
 
 // 미초기화 config가 필요하므로 기존 27개와 분리한 로컬 검증기에서 호출합니다.
@@ -14,11 +14,15 @@ export function initializationChecks(provider: anchor.AnchorProvider, program: a
   it("S16: 초기 config 없이 0·중복 founders를 simulate하면 InvalidFounder, 생성 없음", async () => {
     const valid = founders.map(k => k.publicKey);
     for (const keys of [[PublicKey.default, ...valid.slice(1)], [valid[0], valid[0], valid[2], valid[3]]]) {
-      let error: any;
-      try {
-        await program.methods.initialize(keys).accountsStrict({ config, authority: attacker.publicKey, systemProgram: SystemProgram.programId }).signers([attacker]).simulate();
-      } catch (e) { error = e; }
-      assert.equal(error?.error?.errorCode?.code, "InvalidFounder", String(error));
+      const ix = await program.methods.initialize(keys).accountsStrict({ config, authority: attacker.publicKey, systemProgram: SystemProgram.programId }).instruction();
+      const { blockhash } = await provider.connection.getLatestBlockhash("confirmed");
+      // Anchor 0.30.1 legacy simulate가 payer 서명을 덮어쓰지 않도록 v0 메시지를 직접 서명합니다.
+      const tx = new VersionedTransaction(new TransactionMessage({ payerKey: attacker.publicKey, recentBlockhash: blockhash, instructions: [ix] }).compileToV0Message());
+      tx.sign([attacker]);
+      const simulation = await provider.connection.simulateTransaction(tx, { sigVerify: true, commitment: "confirmed" });
+      const parsed = anchor.AnchorError.parse(simulation.value.logs || []);
+      assert.equal(parsed?.error?.errorCode?.code, "InvalidFounder", JSON.stringify(simulation.value));
+      assert.isAbove(simulation.value.unitsConsumed!, 0);
       assert.isNull(await provider.connection.getAccountInfo(config));
     }
     note("S16", { invalid_founders: "InvalidFounder", method: "독립 로컬 검증기에서 simulate", config_created: false });
