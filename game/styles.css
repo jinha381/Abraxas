@@ -797,3 +797,52 @@ body.night .lab-step.next { background: #5a5480; }
 }
 .lab-results li { grid-template-columns: 1fr 96px 78px; }
 .lab-results b small { display: block; font-size: 9px; color: var(--muted); }
+
+/* ---------- 점묘 덩굴 장식 ---------- */
+.fil { position: relative; }
+.fil::before, .fil::after {
+  content: ""; position: absolute; z-index: 1; width: 104px; height: 104px; pointer-events: none;
+  background: var(--ink-soft); opacity: .5;
+  -webkit-mask: var(--fil-corner) no-repeat 0 0 / 100% 100%; mask: var(--fil-corner) no-repeat 0 0 / 100% 100%;
+}
+.fil::before { top: 8px; right: 8px; transform: scaleX(-1); }
+.fil::after { bottom: 8px; left: 8px; transform: scaleY(-1); }
+.fil.fil-tr::before { right: auto; left: 8px; transform: none; }
+.fil.fil-tr::after { left: auto; right: 8px; transform: rotate(180deg); }
+.fil.fil-top::after { bottom: auto; top: 8px; left: 8px; transform: none; }
+.tree-panel.fil { overflow: visible; }
+/* 무대 하늘의 점묘 소용돌이(양쪽 위) */
+.stage.fil-sky::after {
+  content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: #fff; opacity: .7;
+  -webkit-mask: var(--fil-corner) no-repeat left 14px top 78px / 96px 96px, var(--fil-corner-r) no-repeat right 14px top 92px / 96px 96px;
+  mask: var(--fil-corner) no-repeat left 14px top 78px / 96px 96px, var(--fil-corner-r) no-repeat right 14px top 92px / 96px 96px;
+}
+body.night .stage.fil-sky::after { background: #d9d2ff; opacity: .55; }
+@media (max-width: 760px) { .stage.fil-sky::after { -webkit-mask-size: 64px 64px; mask-size: 64px 64px; } }
+.fil-divider { display: block; width: 200px; height: 24px; margin: 4px 0 2px; background: var(--ink-soft); opacity: .7;
+  -webkit-mask: var(--fil-divider) no-repeat 0 50% / contain; mask: var(--fil-divider) no-repeat 0 50% / contain; }
+body.night .fil::before, body.night .fil::after, body.night .fil-divider { background: #b9b2e0; }
+
+/* 성향 트리: 점묘 덩굴 연결선 */
+.tt-vine rect { fill: var(--muted); }
+.tt-vine.off rect { fill: var(--muted); opacity: .55; }
+.tt-vine.off rect.c { opacity: .4; }
+.tt-vine.on rect { fill: #c9a74e; }
+.tt-vine.on rect.c { fill: #d9c27e; }
+.tt-vine.evo rect { fill: #f0d27a; }
+.tt-vine.evo rect.c { fill: #e8c45c; }
+.tt-vine.next rect { fill: #c9ad5a; opacity: .8; }
+.tt-vine rect.sp { fill: #b7a6e6; }
+.tt-vine.evo rect.sp { fill: #fff3b8; }
+.tt-glowdots rect { fill: rgba(246, 230, 166, .55); }
+body.night .tt-vine.on rect { fill: #e3cd8a; }
+.tt-wrap.anim .tt-vine.evo rect, .tt-wrap.anim .tt-glowdots rect { opacity: 0; }
+.evo-scene.lit .tt-wrap.anim .tt-vine.evo rect, .evo-scene.lit .tt-wrap.anim .tt-glowdots rect { animation: dot-in .01s steps(1) forwards; animation-delay: calc(var(--i) * 9ms); }
+@keyframes dot-in { to { opacity: 1; } }
+
+/* 실험실 꽃: 점묘 소용돌이 */
+.flower svg { width: 86px; height: 134px; }
+@media (max-width: 760px) {
+  .fil::before, .fil::after { width: 72px; height: 72px; }
+  .flower svg { width: 58px; height: 90px; }
+}

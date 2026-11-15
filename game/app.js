@@ -204,6 +204,141 @@
     }
     defs.innerHTML = out;
   })();
+  /* =========================================================
+     점묘 덩굴 장식(filigree): 소용돌이·덩굴을 픽셀 점으로 찍는다.
+     프레임 모서리, 실험실 꽃, 성향 트리 연결선에 공통으로 쓴다.
+     ========================================================= */
+  const FIL = (() => {
+    const TAU = Math.PI * 2;
+    const bez = (p0, p1, p2, p3, n = 80) =>
+      Array.from({ length: n + 1 }, (_, i) => {
+        const t = i / n, u = 1 - t;
+        return [u * u * u * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t * t * t * p3[0], u * u * u * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t * t * t * p3[1]];
+      });
+    const spiral = (cx, cy, r0, r1, turns, a0, dir = 1, n = 120) =>
+      Array.from({ length: n + 1 }, (_, i) => {
+        const t = i / n, a = a0 + dir * t * turns * TAU, r = r0 + (r1 - r0) * t;
+        return [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
+      });
+    function resample(pts, gap) {
+      const out = [pts[0]];
+      let acc = 0;
+      for (let i = 1; i < pts.length; i++) {
+        const [x0, y0] = pts[i - 1], [x1, y1] = pts[i];
+        let seg = Math.hypot(x1 - x0, y1 - y0), t0 = 0;
+        while (acc + seg * (1 - t0) >= gap) {
+          const need = gap - acc, tt = t0 + need / seg;
+          out.push([x0 + (x1 - x0) * tt, y0 + (y1 - y0) * tt]);
+          t0 = tt;
+          acc = 0;
+        }
+        acc += seg * (1 - t0);
+      }
+      return out;
+    }
+    function snap(pts, grid, seen) {
+      const out = [];
+      pts.forEach(([x, y]) => {
+        const sx = Math.round(x / grid) * grid, sy = Math.round(y / grid) * grid, k = sx + "," + sy;
+        if (seen && seen.has(k)) return;
+        if (seen) seen.add(k);
+        out.push([sx, sy]);
+      });
+      return out;
+    }
+    const rects = (pts, size, cls = "", idx = null) =>
+      pts.map(([x, y], i) => '<rect' + (cls ? ' class="' + cls + '"' : "") + ' x="' + (x - size / 2) + '" y="' + (y - size / 2) + '" width="' + size + '" height="' + size + '"' + (idx !== null ? ' style="--i:' + (idx + i) + '"' : "") + "/>").join("");
+    // 두 점을 잇는 덩굴: S자 줄기 + 양옆 소용돌이 덩굴손 + 작은 잎
+    function vine(a, b, seed = 1, o = {}) {
+      const rnd = seeded(seed), dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1;
+      const nx = -dy / len, ny = dx / len, sg = seed % 2 ? 1 : -1, off = Math.min(46, len * 0.16) * sg;
+      const c1 = [a[0] + dx * 0.32 + nx * off, a[1] + dy * 0.32 + ny * off], c2 = [a[0] + dx * 0.68 - nx * off, a[1] + dy * 0.68 - ny * off];
+      const curve = bez(a, c1, c2, b, 120);
+      const main = resample(curve, o.gap || 10);
+      const curls = [];
+      if (len > 70 && o.curls !== false) {
+        [[0.42, sg, 20, 1.55], [0.74, -sg, 13, 1.4]].forEach(([t, side, R, turns]) => {
+          const i = Math.floor(t * 120), p = curve[i], q = curve[Math.min(120, i + 1)];
+          const tx = q[0] - p[0], ty = q[1] - p[1], tl = Math.hypot(tx, ty) || 1;
+          const px = (-ty / tl) * side, py = (tx / tl) * side;
+          const cx = p[0] + px * (R + 2), cy = p[1] + py * (R + 2), a0 = Math.atan2(p[1] - cy, p[0] - cx);
+          curls.push(...resample(spiral(cx, cy, R, 2.5, turns, a0, side, 140), o.curlGap || 7));
+        });
+        const lt = 0.2 + rnd() * 0.08, i = Math.floor(lt * 120), p = curve[i];
+        curls.push([p[0] + nx * 9 * -sg, p[1] + ny * 9 * -sg], [p[0] + nx * 15 * -sg + dx / len * 4, p[1] + ny * 15 * -sg + dy / len * 4]);
+      }
+      return { main, curls };
+    }
+    // 픽셀 반짝이(+): 중심 1칸과 네 방향 팔
+    const sparkle = (x, y, arm = 2, c = 3) => {
+      const out = [[x, y]];
+      for (let k = 1; k <= arm; k++) out.push([x + k * c, y], [x - k * c, y], [x, y + k * c], [x, y - k * c]);
+      return out;
+    };
+    // 크기가 다른 점: [x, y, size]
+    const dots = (list) => list.map(([x, y, z]) => '<rect x="' + (x - z / 2) + '" y="' + (y - z / 2) + '" width="' + z + '" height="' + z + '"/>').join("");
+    // 모서리 장식(120×120, 패널 안쪽 왼위 모서리 기준): 소용돌이 + 가늘어지는 점 꼬리 + 반짝이
+    function cornerSvg() {
+      const seen = new Set(), list = [];
+      const put = (pts, z0, z1) => snap(pts, 2, seen).forEach((p, i, a) => list.push([p[0], p[1], Math.round(z0 + (z1 - z0) * (i / Math.max(1, a.length - 1)))]));
+      // 소용돌이: 안에서 밖으로 감기며 점이 커진다
+      put(resample(spiral(40, 40, 3, 15, 1.35, Math.PI * 0.25, 1, 160), 5.2).reverse(), 5, 3);
+      // 꼬리 1: 소용돌이 바깥에서 위 모서리를 따라 오른쪽으로
+      put(resample(bez([28, 30], [24, 12], [52, 10], [114, 9]), 6), 5, 2);
+      // 꼬리 2: 왼쪽 모서리를 따라 아래로(짧게)
+      put(resample(bez([30, 52], [14, 62], [10, 80], [10, 110]), 6.5), 4, 2);
+      [[72, 22, 3], [86, 26, 2], [24, 72, 3], [20, 92, 2]].forEach((d) => list.push(d));
+      const sp = sparkle(84, 42, 2, 3).concat(sparkle(48, 86, 1, 3)).map(([x, y]) => [x, y, 3]);
+      return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" shape-rendering="crispEdges">' + dots(list) + dots(sp) + "</svg>";
+    }
+    // 제목 아래 구분 장식(240×28)
+    function dividerSvg() {
+      const seen = new Set(), g = 3;
+      let pts = [];
+      const add = (arr, gap) => (pts = pts.concat(snap(resample(arr, gap), g, seen)));
+      add(bez([4, 14], [60, 2], [90, 26], [112, 14]), 6);
+      add(bez([236, 14], [180, 2], [150, 26], [128, 14]), 6);
+      add(spiral(26, 14, 9, 1.5, 1.5, Math.PI, 1), 5);
+      add(spiral(214, 14, 9, 1.5, 1.5, 0, -1), 5);
+      add(spiral(84, 14, 6, 1.5, 1.2, -Math.PI / 2, -1), 5);
+      add(spiral(156, 14, 6, 1.5, 1.2, -Math.PI / 2, 1), 5);
+      pts.push(...snap(sparkle(120, 14, 2, 3), g, seen));
+      return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 28" shape-rendering="crispEdges">' + rects(pts, 3) + "</svg>";
+    }
+    // 점묘 꽃(64×100): 소용돌이 꽃잎 6장 + 덩굴손 줄기
+    function flower(color, center, stem = "#7f9b78") {
+      const g = 2, seenS = new Set(), seenP = new Set(), disc = (cx, cy, r) => {
+        const out = [];
+        for (let y = -r; y <= r; y += g) for (let x = -r; x <= r; x += g) if (x * x + y * y <= r * r + 1) out.push([Math.round((cx + x) / g) * g, Math.round((cy + y) / g) * g]);
+        return out;
+      };
+      let st = [], pe = [], fl = [];
+      st = st.concat(snap(resample(bez([32, 99], [24, 80], [42, 64], [32, 42]), 2.4), g, seenS));
+      st = st.concat(snap(resample(spiral(19, 72, 9, 1.5, 1.45, 0, -1), 2.4), g, seenS));
+      st = st.concat(snap(resample(spiral(46, 60, 8, 1.5, 1.45, Math.PI, 1), 2.4), g, seenS));
+      st = st.concat(snap(resample(bez([31, 88], [22, 84], [16, 92], [8, 93]), 2.4), g, seenS));
+      st = st.concat(snap(resample(bez([34, 82], [44, 78], [50, 84], [57, 83]), 2.4), g, seenS));
+      const C = [32, 24];
+      for (let k = 0; k < 6; k++) {
+        const a = (k / 6) * TAU - Math.PI / 2, cx = C[0] + Math.cos(a) * 12, cy = C[1] + Math.sin(a) * 12;
+        fl = fl.concat(disc(cx, cy, 7));
+        pe = pe.concat(snap(resample(spiral(cx, cy, 8, 1.5, 1.2, a + Math.PI, 1), 2.2), g, seenP));
+      }
+      const ctr = disc(C[0], C[1], 5);
+      return (
+        '<svg viewBox="0 0 64 100" shape-rendering="crispEdges"><g fill="' + color + '" opacity=".45">' + rects(fl, 2) + "</g>" +
+        '<g fill="' + stem + '">' + rects(st, 2) + '</g><g fill="' + color + '">' + rects(pe, 2) + '</g><g fill="' + center + '">' + rects(ctr, 2) + '</g><g fill="#4a4770" opacity=".5">' + rects([[C[0] - 2, C[1] - 2], [C[0] + 2, C[1] + 2]], 2) + "</g></svg>"
+      );
+    }
+    return { vine, rects, snap, sparkle, cornerSvg, dividerSvg, flower };
+  })();
+  (function installFiligree() {
+    const url = (svg) => 'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")';
+    const corner = FIL.cornerSvg();
+    document.documentElement.style.setProperty("--fil-corner", url(corner));
+    document.documentElement.style.setProperty("--fil-corner-r", url(corner.replace('crispEdges">', 'crispEdges"><g transform="translate(120 0) scale(-1 1)">').replace("</svg>", "</g></svg>")));
+    document.documentElement.style.setProperty("--fil-divider", url(FIL.dividerSvg()));
+  })();
   function pixelSvg(rows, w, h) {
     let d = "";
     rows.forEach((row, y) => {
@@ -355,7 +490,7 @@
       label +
       "</div><h1>" +
       title +
-      "</h1><p>" +
+      '</h1><span class="fil-divider" aria-hidden="true"></span><p>' +
       description +
       "</p></div>" +
       extra +
@@ -1110,7 +1245,7 @@
     const list = [...state.pets.filter((q) => q.owner === state.wallet), ...state.pets.filter((q) => q.owner !== state.wallet && q.owner !== "escrow")];
     return (
       '<div class="home2">' +
-      '<section class="panel stage-panel" id="stage-panel"><div class="stage" id="stage">' +
+      '<section class="panel stage-panel" id="stage-panel"><div class="stage fil-sky" id="stage">' +
       '<div class="stars" id="stars"></div><div class="sky-orb">' + skyOrb() + "</div>" +
       '<span class="cloud" style="top:64px">' + cloudSvg() + '</span><span class="cloud c2">' + cloudSvg() + "</span>" +
       '<div class="layer far" id="layer-far"></div><div class="layer near" id="layer-near"></div><div class="mist"></div>' +
@@ -1160,14 +1295,20 @@
     return 'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")';
   }
   function decoUrl(seed, cs) {
-    const W = 960, H = 96, u = 4, cols = W / u, rnd = seeded(seed);
+    // 점묘 덩굴풀과 소용돌이 꽃 (2px 격자)
+    const W = 960, H = 96, u = 2, cols = W / u, rnd = seeded(seed);
+    const CURL = [[0, 0], [0, -1], [0, -2], [0, -3], [1, -4], [2, -5], [3, -5], [4, -4], [4, -3], [3, -2], [2, -3]];
+    const CURL2 = [[0, 0], [0, -1], [-1, -2], [-2, -3], [-3, -3], [-4, -2], [-4, -1], [-3, 0], [-2, -1]];
+    const BLOOM = [[0, -2], [1, -3], [2, -2], [1, -1], [-1, -2], [-2, -3], [-3, -2], [-2, -1], [0, -4], [-1, -5], [0, -6], [1, -5]];
+    const STEM = [[0, 0], [0, 1], [0, 2], [1, 3], [2, 3], [3, 2], [-1, 4], [-1, 5]];
+    const px = (pts, x, y, c) => '<path fill="' + c + '" d="' + pts.map(([dx, dy]) => "M" + (x + dx) + " " + (y + dy) + "h1v1h-1z").join("") + '"/>';
     let s = "";
     for (let i = 0; i < 26; i++) {
-      const x = Math.floor(rnd() * (cols - 4)), y = 6 + Math.floor(rnd() * 14), kind = rnd();
-      if (kind < 0.55) s += '<path fill="' + cs.grass2 + '" d="M' + x + " " + (y - 2) + "h1v2h-1zM" + (x + 2) + " " + (y - 3) + "h1v3h-1zM" + (x + 1) + " " + (y - 1) + 'h1v1h-1z"/>';
+      const x = 6 + Math.floor(rnd() * (cols - 12)), y = 14 + Math.floor(rnd() * 26), kind = rnd();
+      if (kind < 0.55) s += px(rnd() < 0.5 ? CURL : CURL2, x, y, cs.grass2);
       else {
         const c = [cs.rose, cs.butter, "#ffffff", cs.lilac][Math.floor(rnd() * 4)];
-        s += '<path fill="' + cs.grass2 + '" d="M' + (x + 1) + " " + (y - 2) + 'h1v2h-1z"/><path fill="' + c + '" d="M' + x + " " + (y - 4) + "h3v1h-3zM" + (x + 1) + " " + (y - 5) + "h1v3h-1z" + '"/>';
+        s += px(STEM, x, y - 1, cs.grass2) + px(BLOOM, x, y - 1, c) + px([[-1, -3], [0, -3]], x, y - 1, "#fff6c9");
       }
     }
     const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + cols + " " + H / u + '" shape-rendering="crispEdges">' + s + "</svg>";
@@ -1594,7 +1735,7 @@
         esc(state.wallet) + "의 " + esc(me.name) + "가 산책을 나왔어요. 다른 계정의 뉴로링을 만나도, 친구 맺기를 눌러야만 친구가 돼요.",
         button("go-home", icon("home") + " 정원으로 돌아가기", "small"),
       ) +
-      '<section class="panel stage-panel plaza-panel"><div class="stage plaza" id="stage">' +
+      '<section class="panel stage-panel plaza-panel"><div class="stage plaza fil-sky" id="stage">' +
       '<div class="stars" id="stars"></div><div class="sky-orb">' + skyOrb() + "</div>" +
       '<span class="cloud" style="top:52px">' + cloudSvg() + '</span><span class="cloud c2">' + cloudSvg() + "</span>" +
       '<div class="layer far" id="layer-far"></div><div class="layer near" id="layer-near"></div><div class="mist"></div>' +
@@ -1863,17 +2004,7 @@
   const hungerOf = (p) => Math.max(0, Math.min(1, 1 - p.stats.food / 100));
   const LAB = { gen: 0, busy: false, flash: null };
   function flowerSvg(key) {
-    const c = ODORS[key].color, m = ODORS[key].center, g = "#7f9b78";
-    const rows = [
-      "..pp.pp..", ".pppppppp", "pppmmmppp", ".ppmmmpp.", "pppmmmppp", ".pppppppp", "..pp.pp..",
-      "....s....", "..l.s....", "..lls.ll.", "....sll..", "....s....",
-    ];
-    let s = "";
-    rows.forEach((row, y) => [...row].forEach((ch, x) => {
-      const col = ch === "p" ? c : ch === "m" ? m : ch === "s" || ch === "l" ? g : null;
-      if (col) s += '<rect x="' + x + '" y="' + y + '" width="1" height="1" fill="' + col + '"/>';
-    }));
-    return '<svg viewBox="0 0 9 12" shape-rendering="crispEdges">' + s + "</svg>";
+    return FIL.flower(ODORS[key].color, ODORS[key].center);
   }
   function labStepState(o) {
     const has = (k) => o.tests.some((t) => t.kind === k);
@@ -1931,7 +2062,7 @@
         esc(p.name) + "와 함께하는 버섯체 연합학습 미션이에요. 향기와 먹이를 짝지으면 그 향기의 가치가 학습되고, 배고픔은 그 기억이 행동으로 드러나는 정도를 바꿔요.",
         button("go-home", icon("home") + " 정원으로 돌아가기", "small")) +
       (ownOk ? "" : '<section class="panel empty-state">' + icon("paw") + "<h2>내 뉴로링을 골라 주세요</h2><p>아기 단계 이상인 내 뉴로링만 실험할 수 있어요.</p></section>") +
-      '<div class="lab-grid"><section class="panel stage-panel"><div class="stage plaza lab" id="stage">' +
+      '<div class="lab-grid"><section class="panel stage-panel"><div class="stage plaza lab fil-sky" id="stage">' +
       '<div class="stars" id="stars"></div><div class="layer far" id="layer-far"></div><div class="layer near" id="layer-near"></div><div class="mist"></div>' +
       '<div class="ground"></div><div class="ground-deco" id="ground-deco"></div><div class="motes" id="motes"></div>' +
       '<div class="flower fl-left" id="flower-left">' + flowerSvg("A") + '<span class="fl-tag" id="tag-left">딸기 향</span></div>' +
@@ -2278,22 +2409,40 @@
     const got = TRAITS.map((t) => hasTrait(p, t));
     const pathOf = (t) => (t && t.from !== "J1" && t.from !== "J2" ? [...pathOf(traitById(t.from)), t.id] : t ? [t.id] : []);
     const evoPath = evoId ? pathOf(traitById(evoId)) : [];
-    let lines = "", glow = "", kids = "", nodes = "";
+    let lines = "", glow = "", kids = "", nodes = "", evoIdx = 0;
+    const SZ = { on: [7, 5, 10, 7], evo: [8, 5, 9, 7], off: [5, 4, 13, 9], next: [5, 4, 11, 8] };
+    const vineMarkup = (a, b, state, seed, o = {}) => {
+      const [ms, cs, gap, cgap] = SZ[state];
+      const v = FIL.vine(a, b, seed, { gap, curlGap: cgap, curls: o.curls });
+      const seen = new Set(), m = FIL.snap(v.main, 3, seen), c = FIL.snap(v.curls, 3, seen);
+      const anim = state === "evo";
+      if (anim) glow += '<g class="tt-glowdots">' + FIL.rects(m, 16, "", evoIdx) + "</g>";
+      let sp = "";
+      if (state !== "off" && v.main.length > 6) {
+        const k = Math.floor(v.main.length * 0.55), p0 = v.main[k], p1 = v.main[Math.min(v.main.length - 1, k + 1)];
+        const tx = p1[0] - p0[0], ty = p1[1] - p0[1], tl = Math.hypot(tx, ty) || 1, side = seed % 2 ? 1 : -1;
+        const sx = Math.round((p0[0] - (ty / tl) * 26 * side) / 3) * 3, sy = Math.round((p0[1] + (tx / tl) * 26 * side) / 3) * 3;
+        sp = FIL.rects(FIL.sparkle(sx, sy, 2, 4), 4, "sp", anim ? evoIdx + m.length + c.length : null);
+      }
+      const out = '<g class="tt-vine ' + state + '">' + FIL.rects(m, ms, "", anim ? evoIdx : null) + FIL.rects(c, cs, "c", anim ? evoIdx + m.length : null) + sp + "</g>";
+      if (anim) evoIdx += m.length + c.length + 9;
+      return out;
+    };
     const trunkOn = got.some(Boolean);
-    lines += '<path class="tt-line ' + (trunkOn ? "on" : "") + (evoPath.length ? " evo" : "") + '" d="M' + TJ.R[0] + " " + TJ.R[1] + " L" + TJ.J1[0] + " " + TJ.J1[1] + '"/>';
     const upOn = TRAITS.some((t, i) => got[i] && (t.from === "J2" || (t.from !== "J1" && traitById(t.from).from === "J2")));
     const upEvo = evoPath.length && traitById(evoPath[0]).from === "J2";
-    lines += '<path class="tt-line ' + (upOn ? "on" : "") + (upEvo ? " evo" : "") + '" d="M' + TJ.J1[0] + " " + TJ.J1[1] + " L" + TJ.J2[0] + " " + TJ.J2[1] + '"/>';
-    if (evoPath.length) glow += '<path class="tt-glow" d="M' + TJ.R[0] + " " + TJ.R[1] + " L" + TJ.J1[0] + " " + TJ.J1[1] + '"/>';
-    if (upEvo) glow += '<path class="tt-glow" d="M' + TJ.J1[0] + " " + TJ.J1[1] + " L" + TJ.J2[0] + " " + TJ.J2[1] + '"/>';
-    if (evoPath.length > 1) glow += '<path class="tt-glow" d="' + step(parentPt(traitById(evoPath[0])), [traitById(evoPath[0]).x, traitById(evoPath[0]).y]) + '"/>';
+    lines += vineMarkup(TJ.R, TJ.J1, evoPath.length ? "evo" : trunkOn ? "on" : "off", 3);
+    lines += vineMarkup(TJ.J1, TJ.J2, upEvo ? "evo" : upOn ? "on" : "off", 8);
+    evoPath.forEach((id) => {
+      const t = traitById(id);
+      lines += vineMarkup(parentPt(t), [t.x, t.y], "evo", hashStr(t.id) % 97 + 2);
+    });
     TRAITS.forEach((t, i) => {
       const on = got[i], evo = evoPath.includes(t.id), isMain = t.id === evoId;
-      lines += '<path class="tt-line ' + (on ? "on" : "") + (evo ? " evo" : "") + '" d="' + step(parentPt(t), [t.x, t.y]) + '"/>';
-      if (evo) glow += '<path class="tt-glow" d="' + step(parentPt(t), [t.x, t.y]) + '"/>';
-      t.kids.forEach(([kx, ky]) => {
+      if (!evo) lines += vineMarkup(parentPt(t), [t.x, t.y], on ? "on" : "off", hashStr(t.id) % 97 + 2);
+      t.kids.forEach(([kx, ky], j) => {
         const next = isMain && p.stage === 3;
-        lines += '<path class="tt-line ' + (next ? "next" : "locked") + '" d="' + step([t.x, t.y], [kx, ky]) + '"/>';
+        lines += vineMarkup([t.x, t.y], [kx, ky], next ? "next" : "off", hashStr(t.id) % 50 + j * 7 + 1);
         kids += '<g class="tt-kid' + (next ? " next" : "") + '" transform="translate(' + kx + " " + ky + ')"><title>' + (next ? "다음 진화 노드 · 준비 중" : "추후 진화 가능") + "</title>" + pxHex(20, "tk") + '<use href="#i-spark" x="-6" y="-6" width="12" height="12" class="tt-kid-icon"/></g>';
       });
       const prog = t.req.map(([label, f, goal, fmt]) => label + " " + (fmt ? fmt(f(p)) : f(p)) + "/" + (fmt ? fmt(goal) : goal)).join(" · ");
@@ -2349,7 +2498,7 @@
       state.pets.filter((q) => q.owner !== "escrow").map((q) =>
         '<button class="filter-button ' + (q.id === p.id ? "active" : "") + '" data-action="select" data-pet="' + q.id + '">' + esc(q.name) + "</button>").join("") +
       "</div>" +
-      '<section class="panel tree-panel">' + traitTree(p) +
+      '<section class="panel tree-panel fil fil-top">' + traitTree(p) +
       '<div class="tt-legend"><span><i class="lg on"></i>획득한 성향</span><span><i class="lg evo"></i>진화 경로</span><span><i class="lg off"></i>아직 얻지 못한 성향</span><span><i class="lg lock"></i>추후 진화 가능</span>' +
       '<span class="tt-exp">' + evoPreview(p) + "</span></div></section>" +
       '<div class="trait-list">' + TRAITS.map((t) => traitItem(p, t)).join("") + "</div>"
