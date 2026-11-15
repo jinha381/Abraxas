@@ -5,7 +5,7 @@ import { createHash, randomBytes } from "crypto";
 import { Keypair, PublicKey, SystemProgram, Transaction, SYSVAR_CLOCK_PUBKEY, ComputeBudgetProgram } from "@solana/web3.js";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import { keypairIdentity, publicKey } from "@metaplex-foundation/umi";
-import { mplCore, transferV1, fetchAssetV1 } from "@metaplex-foundation/mpl-core";
+import { mplCore, transferV1, fetchAssetV1, fetchAsset, addPlugin, burnV1, getMplCoreErrorFromCode } from "@metaplex-foundation/mpl-core";
 import { mkdirSync, writeFileSync } from "fs";
 
 describe("HatchMind local on-chain integration", function () {
@@ -512,6 +512,90 @@ describe("HatchMind local on-chain integration", function () {
       assert.isTrue((await program.account.giftClaim.fetch(g.address)).claimed);
       await unchanged([g.address, asset.publicKey], () => claim(g, bob), "AlreadyClaimed");
       note("R02", { verdict: "RISK 재현", recipient_bound: false, third_party_claimed: true });
+    });
+    function coreFailure(error: any) {
+      const details = [String(error), JSON.stringify(error?.logs || []), String(error?.cause), JSON.stringify(error?.cause?.logs || [])].join("\n");
+      const match = details.match(new RegExp("Program " + core.toBase58() + " failed: custom program error: (0x[0-9a-f]+)", "i"));
+      const code = match ? Number(match[1]) : error?.code;
+      assert.isNumber(code, "Core 오류 코드가 있어야 합니다: " + details);
+      const decoded = getMplCoreErrorFromCode(code, umiFor(alice).programs.get("mplCore"));
+      assert.exists(decoded, "고정 SDK가 인식하는 Core 오류여야 합니다: " + details);
+      return { name: decoded!.name, code, message: decoded!.message };
+    }
+    it("C01: 부모 burn 뒤 요청·실행은 InvalidCoreAsset, PetRecord는 남음", async () => {
+      const { asset } = await mintChild(); await mature(asset, alice);
+      await ready(asset, a);
+      const r = await request(asset, a, alice);
+      assert.isTrue((await program.account.breedingRequest.fetch(r.address)).consentB);
+      const umi = umiFor(alice);
+      await burnV1(umi, { asset: publicKey(asset.publicKey.toBase58()) }).sendAndConfirm(umi, { confirm: { commitment: "confirmed" } });
+      const tombstone = await provider.connection.getAccountInfo(asset.publicKey);
+      assert.exists(tombstone); assert.equal(tombstone!.data.length, 1);
+      const previous = await snapshot([pet(asset.publicKey), pet(a.publicKey), r.address]);
+      const nonce = ++sequence, next = { a: asset, b: a, nonce, address: breed(asset.publicKey, a.publicKey, nonce) };
+      await fails(duplicate(next), "InvalidCoreAsset");
+      assert.isNull(await provider.connection.getAccountInfo(next.address));
+      const child = Keypair.generate(); await fails(execution(r, child, alice, alice.publicKey).rpc(), "InvalidCoreAsset");
+      await absent(child);
+      assert.deepEqual(await snapshot([pet(asset.publicKey), pet(a.publicKey), r.address]), previous);
+      assert.isFalse((await program.account.breedingRequest.fetch(r.address)).consumed);
+      note("C01", { verdict: "PASS", request: "InvalidCoreAsset", execute: "InvalidCoreAsset", record_survives: true, tombstone_bytes: tombstone!.data.length, tombstone_lamports: tombstone!.lamports, tombstone_owner: tombstone!.owner.toBase58() });
+    });
+    it("C02: FreezeDelegate 알 선물의 실제 Core 결과와 롤백 관찰", async () => {
+      const { asset } = await mintChild(), umi = umiFor(alice);
+      await addPlugin(umi, { asset: publicKey(asset.publicKey.toBase58()), plugin: { type: "FreezeDelegate", frozen: true } }).sendAndConfirm(umi, { confirm: { commitment: "confirmed" } });
+      assert.isTrue((await fetchAsset(umi, publicKey(asset.publicKey.toBase58()))).freezeDelegate!.frozen);
+      const nonce = ++sequence, address = gift(asset.publicKey, nonce), previous = await snapshot([asset.publicKey, pet(asset.publicKey)]);
+      let error: any;
+      try {
+        await program.methods.createGiftClaim(new anchor.BN(nonce), [...randomBytes(32)], new anchor.BN(120)).accountsStrict({ pet: pet(asset.publicKey), asset: asset.publicKey, gift: address, giver: alice.publicKey, coreProgram: core, systemProgram: SystemProgram.programId }).preInstructions([budget()]).signers([alice]).rpc();
+      } catch (e) { error = e; }
+      if (error) {
+        const observed = coreFailure(error);
+        assert.deepEqual(await snapshot([asset.publicKey, pet(asset.publicKey)]), previous);
+        assert.isNull(await provider.connection.getAccountInfo(address));
+        assert.equal(await ownerOf(asset.publicKey), alice.publicKey.toBase58());
+        note("C02", { verdict: "관찰", gift_succeeded: false, error: observed, state_unchanged: true });
+      } else {
+        assert.equal(await ownerOf(asset.publicKey), address.toBase58());
+        assert.isFalse((await program.account.giftClaim.fetch(address)).claimed);
+        note("C02", { verdict: "관찰", gift_succeeded: true, escrow_owner: true });
+      }
+    });
+    it("C03: 선물 전 Transfer/BurnDelegate가 청구 후 남는지, 이전 위임 공격 관찰", async () => {
+      const results = [];
+      for (const attack of ["transfer", "burn"]) {
+        const { asset } = await mintChild(), umi = umiFor(alice), assetKey = publicKey(asset.publicKey.toBase58());
+        for (const type of ["TransferDelegate", "BurnDelegate"] as const) {
+          await addPlugin(umi, { asset: assetKey, plugin: { type, authority: { type: "Address", address: publicKey(relay.publicKey.toBase58()) } } }).sendAndConfirm(umi, { confirm: { commitment: "confirmed" } });
+        }
+        const delegated = await fetchAsset(umi, assetKey);
+        for (const plugin of [delegated.transferDelegate!, delegated.burnDelegate!]) {
+          assert.equal(plugin.authority.type, "Address");
+          assert.equal((plugin.authority as any).address.toString(), relay.publicKey.toBase58());
+        }
+        const g = await makeGift(asset, alice); await claim(g, bob);
+        assert.equal(await ownerOf(asset.publicKey), bob.publicKey.toBase58());
+        const received = await fetchAsset(umi, assetKey);
+        const authorities = { transfer: received.transferDelegate!.authority, burn: received.burnDelegate!.authority };
+        const previous = await snapshot([asset.publicKey, pet(asset.publicKey), g.address]);
+        const delegate = umiFor(relay); let error: any;
+        try {
+          const builder = attack === "transfer" ? transferV1(delegate, { asset: assetKey, newOwner: publicKey(alice.publicKey.toBase58()) }) : burnV1(delegate, { asset: assetKey });
+          await builder.sendAndConfirm(delegate, { confirm: { commitment: "confirmed" } });
+        } catch (e) { error = e; }
+        if (error) {
+          const observed = coreFailure(error);
+          assert.deepEqual(await snapshot([asset.publicKey, pet(asset.publicKey), g.address]), previous);
+          assert.equal(await ownerOf(asset.publicKey), bob.publicKey.toBase58());
+          results.push({ attack, succeeded: false, authorities, error: observed });
+        } else {
+          if (attack === "transfer") assert.equal(await ownerOf(asset.publicKey), alice.publicKey.toBase58());
+          else assert.equal((await provider.connection.getAccountInfo(asset.publicKey))!.data.length, 1);
+          results.push({ attack, succeeded: true, authorities });
+        }
+      }
+      note("C03", { verdict: results.some(r => r.succeeded) ? "RISK 재현" : "관찰", results });
     });
   });
 });
