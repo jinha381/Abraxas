@@ -6,6 +6,7 @@ import { Keypair, PublicKey, SystemProgram, Transaction, SYSVAR_CLOCK_PUBKEY, Co
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import { keypairIdentity, publicKey } from "@metaplex-foundation/umi";
 import { mplCore, transferV1, fetchAssetV1 } from "@metaplex-foundation/mpl-core";
+import { mkdirSync, writeFileSync } from "fs";
 
 describe("HatchMind local on-chain integration", function () {
   this.timeout(180000);
@@ -353,5 +354,140 @@ describe("HatchMind local on-chain integration", function () {
         config, pet: pet(secondEgg.publicKey), asset: secondEgg.publicKey, owner: user1.publicKey,
       }).signers([user1]).rpc(), "InvalidStage");
     }
+  });
+  describe("추가 검증: 기존 27개 실행 후 독립 자식·지갑 사용", function () {
+    const alice = Keypair.generate(), bob = Keypair.generate(), relay = Keypair.generate();
+    let a: Keypair, b: Keypair;
+    const observations: any[] = [];
+    let successfulBirth: { asset: Keypair; r: Req; signature: string };
+    function note(id: string, result: unknown) {
+      observations.push({ id, result });
+      mkdirSync(".local", { recursive: true });
+      writeFileSync(".local/observations.json", JSON.stringify(observations, null, 2));
+    }
+    async function snapshot(keys: PublicKey[]) {
+      return (await provider.connection.getMultipleAccountsInfo(keys, "confirmed")).map(x => x && ({
+        owner: x.owner.toBase58(), lamports: x.lamports, data: x.data.toString("base64"),
+      }));
+    }
+    async function unchanged(keys: PublicKey[], action: () => Promise<unknown>, error: string) {
+      const previous = await snapshot(keys);
+      await fails(action(), error);
+      assert.deepEqual(await snapshot(keys), previous, "실패 후 계정 상태가 바뀌면 안 됩니다");
+    }
+    async function absent(asset: Keypair) {
+      assert.isNull(await provider.connection.getAccountInfo(asset.publicKey));
+      assert.isNull(await provider.connection.getAccountInfo(pet(asset.publicKey)));
+    }
+    async function alreadyUsed(action: Promise<unknown>) {
+      let error: any;
+      try { await action; } catch (e) { error = e; }
+      assert.exists(error, "기존 계정의 재초기화는 거절되어야 합니다");
+      assert.match(String(error) + JSON.stringify(error.logs || []), /already in use|already been allocated/i);
+    }
+    async function mature(asset: Keypair, owner: Keypair, target = 2) {
+      let record = await program.account.petRecord.fetch(pet(asset.publicKey));
+      while (record.stage < target) {
+        await until(record.changedAt.toNumber() + 3);
+        await program.methods.recordEvolution(record.stage + 1).accountsStrict({
+          config, pet: pet(asset.publicKey), asset: asset.publicKey, owner: owner.publicKey,
+        }).signers([owner]).rpc();
+        record = await program.account.petRecord.fetch(pet(asset.publicKey));
+      }
+    }
+    async function mintChild() {
+      await ready(a, b);
+      const r = await request(a, b, alice); await approve(r, bob);
+      const asset = Keypair.generate();
+      const signature = await execution(r, asset, alice, alice.publicKey).rpc();
+      return { asset, r, signature };
+    }
+    function duplicate(r: Req) {
+      return program.methods.requestBreeding(new anchor.BN(r.nonce), new anchor.BN(120)).accountsStrict({
+        config, petA: pet(r.a.publicKey), petB: pet(r.b.publicKey), assetA: r.a.publicKey, assetB: r.b.publicKey,
+        request: r.address, requester: alice.publicKey, systemProgram: SystemProgram.programId,
+      }).signers([alice]).rpc();
+    }
+    before(async () => {
+      const funding = new Transaction();
+      for (const owner of [alice, bob, relay]) funding.add(SystemProgram.transfer({ fromPubkey: provider.wallet.publicKey, toPubkey: owner.publicKey, lamports: 5 * anchor.web3.LAMPORTS_PER_SOL }));
+      await provider.sendAndConfirm(funding);
+      const foundersChild = async (owner: Keypair) => {
+        await ready(pets[0], pets[1]); const r = await request(); await approve(r);
+        const child = await execute(r); await transfer(child, user1, owner); return child;
+      };
+      a = await foundersChild(alice); b = await foundersChild(bob);
+      let attempts = 0;
+      while (JSON.stringify((await program.account.petRecord.fetch(pet(a.publicKey))).genome) === JSON.stringify((await program.account.petRecord.fetch(pet(b.publicKey))).genome)) {
+        assert.isBelow(attempts++, 8); b = await foundersChild(bob);
+      }
+      await mature(a, alice); await mature(b, bob);
+    });
+    it("S13: child_owner를 실행자·제3자로 바꾸면 Unauthorized, 자식 미생성", async () => {
+      await ready(a, b); const r = await request(a, b, alice); await approve(r, bob);
+      for (const owner of [relay.publicKey, stranger.publicKey]) {
+        const child = Keypair.generate();
+        await unchanged([r.address, pet(a.publicKey), pet(b.publicKey)], () => execution(r, child, relay, owner).rpc(), "Unauthorized");
+        await absent(child);
+      }
+    });
+    it("S14: 비Core 자산은 PDA 제약으로 선행 거절, handler는 독립 fixture에서 검증", async () => {
+      for (const fake of [relay.publicKey, config]) {
+        await unchanged([pet(a.publicKey)], () => program.methods.recordEvolution(3).accountsStrict({ config, pet: pet(a.publicKey), asset: fake, owner: alice.publicKey }).signers([alice]).rpc(), "ConstraintSeeds");
+        for (const side of ["a", "b"]) {
+          const nonce = ++sequence, aa = side === "a" ? fake : a.publicKey, bb = side === "b" ? fake : b.publicKey;
+          const address = breed(aa, bb, nonce);
+          await unchanged([pet(a.publicKey), pet(b.publicKey)], () => program.methods.requestBreeding(new anchor.BN(nonce), new anchor.BN(120)).accountsStrict({ config, petA: pet(a.publicKey), petB: pet(b.publicKey), assetA: aa, assetB: bb, request: address, requester: alice.publicKey, systemProgram: SystemProgram.programId }).signers([alice]).rpc(), "ConstraintSeeds");
+          assert.isNull(await provider.connection.getAccountInfo(address));
+        }
+      }
+    });
+    it("S15: 다른 PetRecord를 pet_a로 전달하면 ConstraintSeeds, 요청 미생성", async () => {
+      const nonce = ++sequence, address = breed(a.publicKey, b.publicKey, nonce);
+      await unchanged([pet(a.publicKey), pet(b.publicKey)], () => program.methods.requestBreeding(new anchor.BN(nonce), new anchor.BN(120)).accountsStrict({ config, petA: pet(b.publicKey), petB: pet(b.publicKey), assetA: a.publicKey, assetB: b.publicKey, request: address, requester: alice.publicKey, systemProgram: SystemProgram.programId }).signers([alice]).rpc(), "ConstraintSeeds");
+      assert.isNull(await provider.connection.getAccountInfo(address));
+    });
+    it("S16: initialize 재호출은 기존 계정 오류, config 불변", async () => {
+      const previous = await snapshot([config]);
+      await alreadyUsed(program.methods.initialize(wallets.map(w => w.publicKey)).accountsStrict({ config, authority: provider.wallet.publicKey, systemProgram: SystemProgram.programId }).rpc());
+      assert.deepEqual(await snapshot([config]), previous);
+    });
+    it("S17: 비founder는 Unauthorized, species>=4는 InvalidFounder, 등록 미생성", async () => {
+      for (const [species, error] of [[0, "Unauthorized"], [4, "InvalidFounder"]] as const) {
+        const child = Keypair.generate();
+        await unchanged([config], () => program.methods.registerPet(species).accountsStrict({ config, pet: pet(child.publicKey), asset: child.publicKey, owner: relay.publicKey, coreProgram: core, systemProgram: SystemProgram.programId }).signers([relay, child]).rpc(), error);
+        await absent(child);
+      }
+    });
+    it("S18: 같은 부모·nonce 재요청은 기존 계정 오류, 요청 불변", async () => {
+      await ready(a, b); const r = await request(a, b, alice), previous = await snapshot([r.address]);
+      await alreadyUsed(duplicate(r)); assert.deepEqual(await snapshot([r.address]), previous);
+    });
+    it("S19: 취소 후 승인 Cancelled, 실행 후 취소 AlreadyConsumed, A의 B 대신 승인 Unauthorized", async () => {
+      await ready(a, b); const cancelled = await request(a, b, alice);
+      await program.methods.cancelBreeding().accountsStrict({ request: cancelled.address, owner: alice.publicKey }).signers([alice]).rpc();
+      await unchanged([cancelled.address], () => approve(cancelled, bob), "Cancelled");
+      const done = await mintChild();
+      await unchanged([done.r.address], () => program.methods.cancelBreeding().accountsStrict({ request: done.r.address, owner: alice.publicKey }).signers([alice]).rpc(), "AlreadyConsumed");
+      await ready(a, b); const waiting = await request(a, b, alice);
+      await unchanged([waiting.address], () => approve(waiting, alice), "Unauthorized");
+    });
+    it("S20: 성장한 펫 선물 InvalidStage, 0 secret_hash BadSecret, 소유자 불변", async () => {
+      const grown = await mintChild(); await mature(grown.asset, alice, 1);
+      const egg = await mintChild();
+      for (const [asset, hash, error] of [[grown.asset, [...randomBytes(32)], "InvalidStage"], [egg.asset, Array(32).fill(0), "BadSecret"]] as const) {
+        const nonce = ++sequence, address = gift(asset.publicKey, nonce);
+        await unchanged([asset.publicKey, pet(asset.publicKey)], () => program.methods.createGiftClaim(new anchor.BN(nonce), [...hash], new anchor.BN(120)).accountsStrict({ pet: pet(asset.publicKey), asset: asset.publicKey, gift: address, giver: alice.publicKey, coreProgram: core, systemProgram: SystemProgram.programId }).preInstructions([budget()]).signers([alice]).rpc(), error);
+        assert.isNull(await provider.connection.getAccountInfo(address));
+        assert.equal(await ownerOf(asset.publicKey), alice.publicKey.toBase58());
+      }
+    });
+    it("S21: 제3자 payer로 실행 성공, 자식 소유자는 owner_a", async () => {
+      await ready(a, b); const r = await request(a, b, alice); await approve(r, bob);
+      const asset = Keypair.generate(), signature = await execution(r, asset, relay, alice.publicKey).rpc();
+      successfulBirth = { asset, r, signature };
+      assert.equal(await ownerOf(asset.publicKey), alice.publicKey.toBase58());
+      assert.isTrue((await program.account.breedingRequest.fetch(r.address)).consumed);
+    });
   });
 });
