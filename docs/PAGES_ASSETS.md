@@ -5,6 +5,10 @@
 - parts.png와 rabbit-parts.png는 도감의 동적 경로에서 사용하므로 제외하지 않습니다.
 - px/ 및 sprites/는 동적 스프라이트 경로를 보수적으로 유지합니다.
 - 현재 미참조가 확인된 파일은 없습니다. 추후 추가 자산은 audit-game-assets.cjs의 참조 판정 후 복사합니다.
+- `node scripts/build-game.cjs /tmp/site` 실행 성공. px manifest의 필수 파일 검사도 유지했습니다.
+- 로컬 HTTP에서 정원(home)·향기 실험실(lab)·성향 트리(traits)의 DOM과 이미지 10건을 검사해 깨진 이미지 0건·DOM 오류 0건을 확인했습니다.
+- 2026-11-15 07:58:32~08:00:33 UTC에 별도 프로필의 Edge headless로 같은 `/tmp/site`를 로컬 서버에서 열어 세 화면의 실제 PNG 렌더링도 확인했습니다. 펫·실험실 꽃·성향 트리가 표시되며 이미지 깨짐은 보이지 않았습니다. favicon.ico 404는 게임 이미지와 별개입니다.
+- 화면 기록은 Git 제외 파일 `.local/pages-home.png`, `.local/pages-lab.png`, `.local/pages-traits.png`입니다. 게임 소스와 동작은 수정하지 않았습니다.
 
 | 파일 | bytes | 배포 | 참조 근거 |
 |---|---:|---|---|

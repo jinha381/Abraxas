@@ -1,5 +1,21 @@
 # 변경 내역
 
+## 2026-11-15 저장소 정리·검증 보강
+
+- 저작권·LICENSE 작업은 사용자 요청으로 보류했습니다.
+- 게임 코드의 참조가 없는 game/_backup 4개 파일을 git rm으로 제거하고 재추적을 막았습니다. 게임의 기존 미커밋 변경은 보존했습니다.
+- 이미지 95개를 파일별로 조사했습니다. parts.png·rabbit-parts.png도 동적 갤러리에서 사용되어 보존했습니다. 미사용이 확정된 이미지가 없어 실제 제외는 0개이며, Pages 빌드 크기는 전후 모두 20,593,784B입니다. 정원·실험실·성향 트리의 로컬 HTTP/DOM 검사와 격리된 Edge headless 렌더링도 확인했습니다. 목록과 이유는 PAGES_ASSETS.md에 있습니다.
+- 기존 Rust 21개 및 온체인 27개의 본문·기대값은 유지하고 후속 describe에서 독립 자식·지갑으로 S13~S21·R01~R02·C01~C03·O02~O03을 추가했습니다. 기존 상태를 쓰는 준비 작업은 27개 실행 뒤에 배치했습니다.
+- R03·S16의 미초기화 상태와 S14 handler fixture는 같은 프로그램 ID의 독립 로컬 검증기에서 확인합니다. S14 정상 경로의 PDA 제약과 genesis 주입 검증을 구별해 기록했습니다.
+- scripts/check-production.sh는 별도 캐시·산출물·ledger·RPC/gossip 포트를 사용합니다. local-testing 없는 빌드의 30일 설정·TooEarly를 확인했습니다.
+- scripts/nonce-grind.cjs는 원래 도메인·부모 순서·u64 LE nonce 규칙을 그대로 사용합니다. 목표 nonce를 온체인에 적용하는 RISK 테스트를 추가했습니다. 비밀값 선청구와 초기화 선점도 성공을 assert합니다. 위험을 고치지 않고 README에 대응안을 기록했습니다.
+- 고정 Core 0.15.3에서 burn 후 1B tombstone·남은 PetRecord, Freeze 선물 InvalidAuthority, 일반 위임 초기화와 이전 위임자의 NoApprovals를 실제 관찰했습니다. 플러그인 API 제약으로 생략한 항목은 없습니다.
+- 성공 트랜잭션 10개 명령의 CU·수수료·신규 계정 최소 rent/실제 예치액을 수집하고 COSTS.md를 생성합니다. BirthEvent의 네 필드를 자식 PetRecord와 대조합니다.
+- devnet은 별도 승인 가드가 있는 스크립트만 작성했습니다. 배포 키·잔액·Core 해시 확인이 필요하며, 기존 프로그램을 덮어쓰거나 에어드롭하지 않습니다. 실제 실행은 승인 대기 상태입니다.
+- logic dev-dependency proptest =1.6.0과 4속성(각 512표본)을 추가하고 logic/Cargo.lock만 갱신했습니다. 기존 루트 잠금 파일과 SDK 버전은 유지했습니다.
+- check.sh·report.py는 Rust 개별 시간과 실제 온체인/독립 운영 결과로 TEST_RESULTS.md를 생성합니다. 최종 검증은 Rust 21 + proptest 4 + 온체인 43 + 독립 운영 4 = 온체인 총 47 통과입니다.
+- 컨트랙트 lib.rs·rules.rs, 계정 레이아웃·IDL 정의·프로그램 ID·seed·종 순서·운영 정책은 변경하지 않았습니다. 모든 새 커밋은 로컬에만 만들며 push하지 않습니다.
+
 기존 소스가 없어 전체 파일을 신규 생성했습니다. 기존 계약의 패치나 보존을 주장하지 않습니다.
 
 | 파일 | 이유 |

@@ -1,6 +1,6 @@
 # 명령별 실제 실행 비용
 
-- 측정 시각(UTC): 2026-11-15T07:36:10.388Z
+- 측정 시각(UTC): 2026-11-15T07:58:50.742Z
 - RPC: `http://127.0.0.1:8899` (로컬 검증기)
 - Anchor 0.30.1, Core 프로그램 0.15.3, JS SDK 1.1.0, Umi 0.9.2, local-testing 3초 설정.
 - 성공 트랜잭션의 RPC 메타데이터 `computeUnitsConsumed`, `fee`, `preBalances`/`postBalances`를 읽고 생성 직후 계정과 rent-exemption 최소액을 조회했습니다.
@@ -10,13 +10,13 @@
 | 명령 | CU 대표 (최소~최대) | 표본 | 신규 계정 | rent 최소 lamports / SOL | 실제 예치 lamports / SOL | tx 수수료 lamports |
 |---|---:|---:|---|---:|---:|---:|
 | initialize | 12280 (12280~12280) | 1 | config(178B) | 2,129,760 / 0.002129760 | 2,129,760 / 0.002129760 | 5000 |
-| register_pet | 25804 (22804~25804) | 4 | asset(133B), pet(160B) | 3,821,040 / 0.003821040 | 5,321,040 / 0.005321040 | 15000 |
-| record_evolution | 10285 (7285~10285) | 18 | 없음 | 0 / 0.000000000 | 0 / 0.000000000 | 10000 |
-| request_breeding | 23124 (17122~26122) | 28 | request(156B) | 1,976,640 / 0.001976640 | 1,976,640 / 0.001976640 | 10000 |
+| register_pet | 22804 (22804~24304) | 4 | asset(133B), pet(160B) | 3,821,040 / 0.003821040 | 5,321,040 / 0.005321040 | 15000 |
+| record_evolution | 7285 (7285~10285) | 18 | 없음 | 0 / 0.000000000 | 0 / 0.000000000 | 10000 |
+| request_breeding | 21624 (17124~30622) | 28 | request(156B) | 1,976,640 / 0.001976640 | 1,976,640 / 0.001976640 | 10000 |
 | approve_breeding | 6072 (6072~15072) | 19 | 없음 | 0 / 0.000000000 | 0 / 0.000000000 | 10000 |
 | cancel_breeding | 6724 (3714~6724) | 2 | 없음 | 0 / 0.000000000 | 0 / 0.000000000 | 10000 |
-| execute_breeding | 53714 (47714~58212) | 14 | childAsset(133B), child(160B) | 3,821,040 / 0.003821040 | 5,321,040 / 0.005321040 | 15000 |
-| create_gift_claim | 20110 (18610~26110) | 7 | gift(123B) | 1,746,960 / 0.001746960 | 1,746,960 / 0.001746960 | 10000 |
+| execute_breeding | 50715 (47712~61211) | 14 | childAsset(133B), child(160B) | 3,821,040 / 0.003821040 | 5,321,040 / 0.005321040 | 15000 |
+| create_gift_claim | 23110 (20110~27849) | 7 | gift(123B) | 1,746,960 / 0.001746960 | 1,746,960 / 0.001746960 | 10000 |
 | claim_egg | 12999 (12999~14966) | 6 | 없음 | 0 / 0.000000000 | 0 / 0.000000000 | 10000 |
 | reclaim_gift | 12856 (12856~12856) | 1 | 없음 | 0 / 0.000000000 | 0 / 0.000000000 | 10000 |
 
@@ -26,16 +26,16 @@
 
 | 명령 | slot | 서명 |
 |---|---:|---|
-| initialize | 211 | `4NcqsYz2RpQN1jS9jzgcXUk6CZzJb4mGj5B6CMJfuMGFn7Fyo9QX9VBy7aUFUskTACABzAa5cDDR7x1kMXo4EFCP` |
-| register_pet | 212 | `2yPitA96NerKpteiqoDnEYoM78fh3pjpg4u95kJUPxNibN5szacDwfW51kYsy9Rvc6HkjwhNCmK3Fr2AArksPMEV` |
-| record_evolution | 224 | `4ihh9oDXPsykwrdD79vkyjegkiGDXaKJHuar6MH2mniA73NiV8jxZWeraZytkBoBewKomnvPHnEjp8nJSmaVVD1J` |
-| request_breeding | 238 | `2notrt93RYRj5BMbGXPgQVQiroT4iBsQVrnwcQxTnrJJRLftZJyRLn5sTZZ6QiBT6Vm9YDpi1AqQZtd77QKa6Gzb` |
-| approve_breeding | 241 | `2Zts6HSpLkNUHJy781cn8jWZ7cTksZMWuMa5X1D7BbdEnWwgrG9tDazeJKqxoNUNeRi1m3Z2BP4zGKfbEi9pDcaK` |
-| cancel_breeding | 250 | `4pcTcmXHLknA5ALu197L3Le9823dH3Yx8TpTMvS7XNCuyHB2MhQxA2G9zHJvFqiZBBYp2ax8SwTvWq6SYB8u8Hh2` |
-| execute_breeding | 265 | `2SdtT4r5hJG8obGqBwMKt6Leaif8DSsjh6T4nGFG1bRy5QtaT2EEVDvCNUGwDMg2gBvjtwXrAgtrXHWQ4zKb9fiD` |
-| create_gift_claim | 274 | `2o624RdZ7XKdDHfhojnnNsqCmFPxCmKHDCgBHXLm9zRNey7xdmUajrv8HJa5p8ecgkgkLE2nWoqxkHJinnAp1wEr` |
-| claim_egg | 275 | `34s5mopHgT4akvREyptbDGCQWp7fKh6ncNdX1TGbC9PtRTUqBQ9HFrepC4oSJo4dd9nsqpMJYgu93N7Vdufh5Jfa` |
-| reclaim_gift | 288 | `oHdNB3NR2g6ouk7NbNJZcK8geCPbwQA67CNs4itzFGGYZ4Z5rjLEJyDyVReAFL251NTWd6thzNGLCMmT3tkVoEr` |
+| initialize | 172 | `2zyQYpaRYbmygtLQuGUMVDYnVQbUeGwtNcfJEvHVvcmufVi2ybLP9sKedo7T9eyb8j3Vw8ZuesmaHVYA2bDrhjZF` |
+| register_pet | 173 | `ysBUcaVQRBfuPXubePgomdjwBeCUVYVCSrZLNc9a1N1Lo2HshSmHsVxJCYGKYJbcS2Ks9zt1ErCUZiouqCRKPpM` |
+| record_evolution | 182 | `4GksRuqgAUNRbEPcqN74dKwZP5GvQaronPjxA7HVxVQ7T1xQ2NdzeDP7PyWJT6MNs5bpYaTparpLZzaGeXZqC2KU` |
+| request_breeding | 196 | `2oKfYzVTD9pYW3928am7R3WFVdgTqQp65k9tjGa4rg512381WWTt7znaGAa6wZ3hXo35QAy2Wfd1jXkWN9q8mbeE` |
+| approve_breeding | 199 | `3pZKSWTjL4KJjRv9tHTPAJ6X6HgYLQsSU5EeoLTkpWzdS3ZzmWvibn9D2xvydUjr5FRQsxztBY1x4dxjdFNwReTu` |
+| cancel_breeding | 208 | `XK4923Ju3UJMjZqTrAomABREx6HL3WRTg75RMftYPi8FVncFiBEPkfKxBddCXN8LRzcepT5cj72BFzAdwvH97Z9` |
+| execute_breeding | 224 | `2QraBd9ABRNY4NWRZRBtbADaDWYDzScSUwbmmi52ex9CSncSDUzir51e4ZAUPx7DDVf162KNimjtBUpibenk96cP` |
+| create_gift_claim | 234 | `5UsiMNSMpNmrisG6FJRTgjMvNFQ8vAMaCE9pAhqoLVSzbWEVZQuKMFvTas2ZdvSceiz4DScMAEZpoNpC2NWMAxbJ` |
+| claim_egg | 235 | `RVu1xgsFgBwVm4HsRrwAYeHAZ1CgUaj8iWcwfmNf9huvGVGe7kdjHwtLf23vdovGvhvzFFFYwYB3v78Ere2aJxQ` |
+| reclaim_gift | 246 | `61u43JpJayxG94sX9Ganzdd9S5TSXRnJz6L73nF99XhXDwrgvDWxsuStdgJ4tqVT1ewXXQRqpC4yMxykFSM3G6cm` |
 
 ## 대표 신규 계정 상세
 

@@ -4,7 +4,7 @@
 
 ## 확인한 결과
 
-순수 Rust 21개, 실제 Core 온체인 통합 27개가 모두 통과했습니다. Anchor 0.30.1의 SBF·IDL 빌드와 기본 30일 운영 설정의 별도 컴파일도 성공했습니다. 테스트별 결과는 [TEST_RESULTS.md](docs/TEST_RESULTS.md), 수정 이유는 [CHANGES.md](docs/CHANGES.md)에 기록합니다.
+순수 Rust 기존 21개와 proptest 4개(각 512표본), 실제 Core 온체인 총 47개가 통과했습니다. 온체인은 3초 설정 43개(기존 27 + 추가 16개)와 독립 30일 운영 빌드 4개입니다. Anchor 0.30.1 SBF·IDL 빌드와 타입 검사도 성공했습니다. R01~R03의 통과는 **현재 허용되는 위험의 성공 재현**이며 해결을 뜻하지 않습니다. 테스트별 시간과 관찰은 [TEST_RESULTS.md](docs/TEST_RESULTS.md), 비용은 [COSTS.md](docs/COSTS.md), 변경은 [CHANGES.md](docs/CHANGES.md)에 기록합니다.
 
 ## 정책
 
@@ -30,7 +30,10 @@
 - programs/hatchmind/src/rules.rs: 공통 순수 규칙
 - logic/src/lib.rs: 위 rules.rs를 직접 포함하여 규칙 불일치를 원천 방지
 - logic/tests/rules_port.rs: 21개 경계·상속·해시 테스트
+- logic/tests/properties.rs: proptest 4속성, 각 512표본
 - tests/hatchmind.ts: 실제 로컬 검증기 통합 테스트
+- validation/production.ts: 독립 검증기의 30일 설정·비Core fixture·초기화 검증
+- validation/devnet-smoke.ts: 기본 테스트에서 제외한 devnet 승인 후 실행용 흐름
 - scripts/setup.sh: 의존성·Core 바이너리·로컬 지갑 준비
 - scripts/check.sh: 규칙 테스트, keys sync, 빌드, 타입 검사, 온체인 테스트
 - docs/TEST_RESULTS.md: 최종 실행 결과와 개별 테스트 목록
@@ -54,7 +57,7 @@
 
 ## 실패 시나리오
 
-아래 ID는 기존 README가 없는 상태에서 이 구현의 검증 항목으로 새로 정했습니다. 아래 항목은 모두 통과했으며, 테스트별 결과는 docs/TEST_RESULTS.md에 기록합니다.
+기존 S01~S12·E01~E05 검증에 실패·위험·Core 경계 상황을 추가했습니다. PASS는 기대한 방어 또는 정상 동작, RISK 재현은 공격 성공, 관찰은 고정 Core 바이너리의 실제 동작을 뜻합니다. 테스트별 결과는 docs/TEST_RESULTS.md에 기록합니다.
 
 | ID | 실패 조건 | 기대 오류 | 검증 |
 |---|---|---|---|
@@ -75,6 +78,27 @@
 | E03 | 만료 후 선물자 회수 | 성공, Core 소유자 복원 | PASS · 온체인 |
 | E04 | 0·음수·상한 초과 TTL | InvalidTtl | PASS · 온체인 + Rust |
 | E05 | 초기 종 중복 발행 | AlreadyRegistered | PASS · 온체인 |
+| S13 | child_owner를 실행자·제3자 지갑으로 바꿈 | Unauthorized | PASS · 부모/요청 불변, 자식·PetRecord 미생성 |
+| S14 | System/다른 프로그램 소유 계정을 성장·교배 양쪽 자산에 전달 | InvalidCoreAsset | PASS · 정상 상태는 ConstraintSeeds 선행; 독립 genesis fixture로 handler InvalidCoreAsset·롤백 확인 |
+| S15 | 다른 펫의 PetRecord를 pet_a로 전달 | seeds/constraint 오류 | PASS · ConstraintSeeds, 요청 미생성 |
+| S16 | initialize 재호출, 0·중복 founders | 기존 계정 오류 / InvalidFounder | PASS · 재호출 시 config 불변; 독립 검증기에서 서명 검증 포함 simulate로 두 InvalidFounder 확인 |
+| S17 | 비founder 등록 / species>=4 | Unauthorized / InvalidFounder | PASS · 등록·자산 미생성, config 불변 |
+| S18 | 같은 부모·nonce 재요청 | 기존 계정 오류 | PASS · already in use, 기존 요청 불변 |
+| S19 | 취소 후 승인 / 소비 후 취소 / A가 B 대신 승인 | Cancelled / AlreadyConsumed / Unauthorized | PASS · 요청 상태 불변 |
+| S20 | 1단계 이상 선물 / 전부 0인 해시 | InvalidStage / BadSecret | PASS · 소유권 불변, Gift PDA 미생성 |
+| S21 | 동의된 요청을 제3자 payer가 실행 | 성공, 자식 소유자 owner_a | PASS · 실제 Core 소유권·consumed 확인 |
+| R01 | 공개 부모 정보로 목표 유전체 nonce 선택 | 공격 성공 재현 | RISK 재현 · 고른 nonce로 실제 목표 자식 발행 |
+| R02 | 비밀값을 아는 제3자가 선물을 먼저 청구 | 공격 성공 재현 | RISK 재현 · 제3자 소유권 획득, 이후 청구 AlreadyClaimed |
+| R03 | 배포 키와 무관한 제3자의 최초 initialize | 공격 성공 재현 | RISK 재현 · 독립 검증기에서 authority·founders 선점 |
+| C01 | 부모 burn 후 교배 요청·기승인 요청 실행 | InvalidCoreAsset | PASS · 자식 미생성, PetRecord 유지; 1B Core tombstone 관찰 |
+| C02 | FreezeDelegate(frozen=true) 알의 선물 생성 | 결과 관찰 | 관찰 · Core InvalidAuthority(9), 전체 롤백·소유자 유지 |
+| C03 | 선물 전 Transfer/BurnDelegate를 다른 키로 위임 후 청구 | 잔존·공격 결과 관찰 | 관찰 · 두 authority가 Owner로 초기화, 이전 위임자의 transfer/burn 모두 NoApprovals(26) |
+| O01 | local-testing 없는 별도 로컬 운영 빌드 | 2592000초 / 즉시 성장 TooEarly | PASS · 독립 산출물·검증기에서 확인 |
+| O02 | 명령 10개의 CU·생성 계정 rent | 실제 트랜잭션 측정 | PASS · [비용 표](docs/COSTS.md) |
+| O03 | BirthEvent와 자식 PetRecord 대조 | child·parents·seed 일치 | PASS · 실제 성공 로그 파싱 |
+| O04 | 별도 devnet 스모크 | 승인 후 배포→청구 | 미실행 · [실행 조건·스크립트](docs/DEVNET.md), 사용자 승인 대기 |
+
+S14 fixture는 유효한 PDA·직렬화된 PetRecord와 비Core 자산의 조합을 로컬 genesis에만 주입합니다. 이 조합을 공격자가 정상 등록 경로에서 만들 수 있다고 주장하지 않습니다. S16은 이미 있는 config를 simulate로 지울 수 없으므로 미초기화 독립 검증기를 사용합니다. [simulateTransaction](https://solana.com/docs/rpc/http/simulatetransaction)은 현재 체인 상태를 사용합니다.
 
 ## 실행 — Windows + WSL Ubuntu
 
@@ -87,7 +111,7 @@ bash scripts/setup.sh
 bash scripts/check.sh
 ```
 
-스크립트는 WSL의 기존 Rust·Solana·nvm을 사용하고 Anchor 0.30.1 직접 바이너리를 선택합니다. 기본 RPC는 Localnet입니다. 통합 테스트는 localhost 이외 RPC에서 즉시 중단합니다. devnet 배포 명령은 포함하지 않습니다.
+스크립트는 WSL의 기존 Rust·Solana·nvm을 사용하고 Anchor 0.30.1 직접 바이너리를 선택합니다. 기본 RPC는 Localnet입니다. 기존 통합 테스트의 localhost 검사는 유지합니다. devnet은 기본 검사에서 실행하지 않는 별도 승인 스크립트만 준비했습니다.
 
 개별 실행:
 
@@ -100,7 +124,7 @@ yarn typecheck
 "$ANCHOR_BIN" test --skip-build
 ```
 
-운영 시간 설정의 컴파일 확인은 `"$ANCHOR_BIN" build`로 실행합니다. 그 결과물은 30일 단계 시간을 사용하므로 3초 통합 테스트에 사용하지 마세요.
+운영 설정은 `bash scripts/check-production.sh`로 검증합니다. local-testing 없이 Anchor build를 실행해 `.local/production/deploy`에 저장하고, 전용 포트 18999·별도 ledger·캐시를 사용합니다. 초기화 후 stage_seconds=2592000과 즉시 성장 TooEarly를 검사합니다. `bash scripts/check.sh`는 다시 3초 산출물을 target/deploy에 빌드합니다. 보고서를 모두 포함하려면 운영 검증 후 check.sh를 실행합니다.
 
 ## 의존성
 
@@ -114,12 +138,14 @@ yarn typecheck
 - Node 24의 네이티브 TypeScript 로더 대신 ts-node의 CommonJS 로더를 명시합니다. Anchor와 Umi의 확정 수준은 confirmed로 통일합니다.
 - CARGO_TARGET_DIR은 WSL의 ~/.cache/hatchmind-target입니다. Windows 디스크의 대량 빌드 파일 쓰기를 피하고 최종 바이너리는 프로젝트 target/deploy에 저장합니다.
 - Cargo.lock, logic/Cargo.lock, yarn.lock을 커밋하여 재현합니다.
+- logic 테스트 dev-dependency에만 proptest `=1.6.0`을 추가했습니다. 나머지 기존 의존성과 루트 Cargo.lock·yarn.lock은 변경하지 않았습니다.
 
 ## 운영 전 보강
 
-- initialize는 아직 배포자 공개키를 프로그램에 고정하지 않았습니다. 업그레이드 권한자에 의한 초기화 인증 또는 배포·초기화 원자화를 검토해야 합니다.
-- 선물 링크는 비밀값 소지자에게 권리를 주는 bearer 방식입니다. 공개 트랜잭션의 비밀값을 다른 지갑이 먼저 사용하는 경쟁을 막으려면 수신 지갑 결합 또는 별도 청구 프로토콜이 필요합니다.
-- 공개 요청번호 기반 seed는 결정적이며 예측 가능합니다. 희귀도 경제에 쓰기 전 검증 가능한 난수 정책을 별도로 설계해야 합니다.
+- **R01 현재 허용됨(위험): nonce 고르기.** 목표 유전체를 만드는 nonce를 찾고 실제 교배 결과가 일치함을 assert했습니다. `rules::inherit`는 seed 앞 7바이트 각각의 최하위 1비트만 사용하므로, 부모가 7자리 모두 다를 때 최대 128가지 결과입니다(같은 자리는 경우의 수 감소). `node scripts/nonce-grind.cjs A공개키 B공개키 A유전체csv B유전체csv 목표csv`로 시도 수·시간을 출력합니다. 도메인을 포함한 기존 SHA-256 seed 규칙은 유지했습니다. 대응안은 B가 제공하는 예측 불가한 값을 승인에 결합하기, 신뢰·편향 가능성을 검토한 최근 slot hash 결합, 커밋–리빌/검증 가능한 난수 도입입니다.
+- **R02 현재 허용됨(위험): 선물 비밀값 가로채기.** 수신자가 고정되지 않아 비밀값을 아는 제3자가 먼저 청구해 Core 소유권을 획득했습니다. 뒤늦은 의도된 수신자는 AlreadyClaimed로 실패합니다. 이는 비밀값을 미리 아는 공격의 재현이며 실제 네트워크 전파 경쟁의 측정은 아닙니다. 대응안은 수신 지갑을 해시에 결합하고 청구 서명자와 대조하거나 별도 청구 프로토콜을 설계하는 것입니다.
+- **R03 현재 허용됨(위험): 초기화 선점.** [initialize](programs/hatchmind/src/lib.rs#L13)는 founders 유효성만 확인하고 호출자 제한은 없습니다. [Initialize](programs/hatchmind/src/lib.rs#L358)의 authority는 일반 Signer입니다. 독립 검증기에서 배포 키와 다른 제3자가 최초 호출해 authority와 founders를 정하는 데 성공했습니다. 대응안은 upgrade authority 또는 고정 관리자만 허용하고 배포 직후 초기화를 보장하는 것입니다.
+- **Core 관찰:** burn 뒤 PetRecord가 남아도 자산 검사로 재교배는 차단됩니다. 죽은 기록·남은 예치액 정리 정책은 별도로 필요합니다. Freeze 선물 실패는 UI에서 사전 안내할 필요가 있습니다. 일반 Transfer/BurnDelegate는 이번 전송에서 초기화되어 이전 위임 공격이 실패했습니다. 이 결과를 Permanent 계열이나 모든 플러그인 조합의 안전성으로 확장하지 않습니다. [공식 위임 설명](https://www.metaplex.com/docs/smart-contracts/core/plugins/delegating-and-revoking-plugins), [burn 설명](https://www.metaplex.com/docs/smart-contracts/core/burn)과 고정 0.15.3 실측을 구분합니다.
 - 요청·선물 상태 계정은 중복 방지를 위해 닫지 않습니다. 운영 시 임대료·정리·장기 재사용 정책이 필요합니다.
 - 외부 검토 및 독립 보안 감사는 수행하지 않았습니다. Core 플러그인 조합, 업그레이드, UI 지갑 승인, 장애 복구와 부하 테스트가 추가로 필요합니다.
 
